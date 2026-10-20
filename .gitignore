@@ -1,0 +1,28 @@
+# Local editor state
+.vs/
+.idea/
+
+# Unreal generated files and caches
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+
+# CMake and vcpkg generated files
+build/
+out/
+CMakeUserPresets.json
+vcpkg_installed/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Paid assets: add exact paths before importing them.
+
+# Local session logs (keep the shared template tracked)
+/docs/sessions/*
+!/docs/sessions/TEMPLATE.md
