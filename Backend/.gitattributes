@@ -1,0 +1,6 @@
+# Handwritten source files use UTF-8 BOM with CRLF, without transcoding.
+Core/*.cpp text eol=crlf
+Core/*.h text eol=crlf
+Server/*.cpp text eol=crlf
+TestClient/*.cpp text eol=crlf
+Tests/*.cpp text eol=crlf

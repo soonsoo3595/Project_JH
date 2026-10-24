@@ -13,6 +13,10 @@ build/
 out/
 CMakeUserPresets.json
 vcpkg_installed/
+logs/
+
+# Local test sources
+/Backend/Tests/
 
 # Local secrets
 .env
