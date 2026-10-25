@@ -2,12 +2,12 @@
 
 int main()
 {
-	const ErrorCode logInitResult = GLogger->Init(LogOutput::Console, LogLevel::Info,
+	const StatusCode logInitResult = GLogger->Init(LogOutput::Console, LogLevel::Info,
 		"logs/backend-test-client.log");
-	if (logInitResult != ErrorCode::EC_SUCCESS)
+	if (logInitResult != StatusCode::SC_SUCCESS)
 	{
 		LOG_FATAL("테스트 클라이언트 로그 초기화에 실패했습니다. 코드=%d (%s)",
-			static_cast<int>(logInitResult), GetErrorMessage(logInitResult));
+			static_cast<int>(logInitResult), GetStatusMessage(logInitResult));
 		return 1;
 	}
 

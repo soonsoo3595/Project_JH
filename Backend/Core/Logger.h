@@ -1,13 +1,12 @@
 ﻿#pragma once
 
 #include "Core/CoreGlobal.h"
-#include "Core/ErrorCode.h"
+#include "Core/StatusCode.h"
 
 #include <cstdio>
-#include <filesystem>
+#include <string>
 #include <memory>
 #include <mutex>
-#include <string_view>
 
 enum class LogLevel
 {
@@ -36,18 +35,18 @@ public:
 	Logger& operator=(Logger&&) = delete;
 
 	// 초기화 실패 시 기존 설정을 유지한다. 기본 상태는 콘솔·Info다.
-	[[nodiscard]] ErrorCode Init(LogOutput output, LogLevel minimumLevel = LogLevel::Info,
-		const std::filesystem::path& filePath = "logs/backend.log");
+	StatusCode Init(LogOutput output, LogLevel minimumLevel = LogLevel::Info,
+		const std::string& filePath = "logs/backend.log");
 	void SetMinimumLevel(LogLevel minimumLevel);
 
 	// UTF-8 메시지를 그대로 기록한다. Fatal도 프로그램을 종료하지 않는다.
-	void Log(LogLevel level, std::string_view message, std::string_view functionName = {});
+	void Log(LogLevel level, const std::string& message, const char* functionName = "");
 	// UTF-8 printf 형식이다. 동적 문자열은 Log 또는 "%s"로 전달한다.
-	void Write(LogLevel level, std::string_view functionName, const char* format, ...);
+	void Write(LogLevel level, const char* functionName, const char* format, ...);
 
 private:
 	// 호출자가 _mutex를 보유한 상태에서 사용한다.
-	void WriteRecord(LogLevel level, std::string_view functionName, std::string_view message);
+	void WriteRecord(LogLevel level, const char* functionName, const std::string& message);
 
 	struct FileCloser
 	{

@@ -1,0 +1,28 @@
+﻿#pragma once
+
+#include "Core/Types.h"
+
+// SC_ 접두사와 대문자 스네이크 표기를 사용한다. 성공은 0, 오류는 종류별 100개 단위로 묶는다.
+// 100~199: 로거, 200~299: 네트워크. 확정된 번호는 재사용하지 않는다.
+enum class StatusCode : int32
+{
+	SC_SUCCESS = 0,
+	SC_LOG_INVALID_LEVEL = 100,
+	SC_LOG_INVALID_OUTPUT = 101,
+	SC_LOG_EMPTY_FILE_PATH = 102,
+	SC_LOG_DIRECTORY_CREATION_FAILED = 103,
+	SC_LOG_FILE_OPEN_FAILED = 104,
+
+	SC_NET_INVALID_ADDRESS = 200,
+	SC_NET_INVALID_SOCKET = 201,
+	SC_NET_SOCKET_ALREADY_OPEN = 202,
+	SC_NET_SOCKET_CREATE_FAILED = 203,
+	SC_NET_SOCKET_OPTION_FAILED = 204,
+	SC_NET_BIND_FAILED = 205,
+	SC_NET_LISTEN_FAILED = 206,
+	SC_NET_SOCKET_CLOSE_FAILED = 207,
+	SC_NET_LOCAL_ADDRESS_FAILED = 208,
+	SC_NET_INVALID_ARGUMENT = 209
+};
+
+const char* GetStatusMessage(StatusCode code) noexcept;

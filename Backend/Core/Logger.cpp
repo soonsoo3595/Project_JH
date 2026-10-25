@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <share.h>
+#include <shlobj.h>
 
 #include <cstdarg>
 #include <cstdio>
@@ -10,7 +11,7 @@
 #include <locale>
 #include <sstream>
 #include <string>
-#include <system_error>
+#include <vector>
 
 // 가변 인수 목록은 포맷 도중 조기 반환되거나 스택이 풀릴 때도 정리한다.
 class LogArgumentScope final
@@ -47,7 +48,7 @@ static const char* GetLevelName(LogLevel level)
 	}
 }
 
-static bool FormatLogMessage(const char* format, std::va_list arguments, std::string& message)
+static bool FormatLogMessage(const char* format, std::va_list arguments, OUT std::string& message)
 {
 	std::va_list sizeArguments;
 	va_copy(sizeArguments, arguments);
@@ -58,7 +59,7 @@ static bool FormatLogMessage(const char* format, std::va_list arguments, std::st
 		return false;
 	}
 	message.resize(static_cast<std::size_t>(length) + 1);
-	const int written = std::vsnprintf(message.data(), message.size(), format, arguments);
+	const int written = std::vsnprintf(&message[0], message.size(), format, arguments);
 	if (written != length)
 	{
 		return false;
@@ -67,7 +68,7 @@ static bool FormatLogMessage(const char* format, std::va_list arguments, std::st
 	return true;
 }
 
-static std::string MakeRecord(LogLevel level, std::string_view functionName, std::string_view message)
+static std::string MakeRecord(LogLevel level, const char* functionName, const std::string& message)
 {
 	SYSTEMTIME time{};
 	GetLocalTime(&time);
@@ -82,7 +83,7 @@ static std::string MakeRecord(LogLevel level, std::string_view functionName, std
 		<< std::setw(2) << time.wSecond << '.'
 		<< std::setw(3) << time.wMilliseconds << "] ["
 		<< GetLevelName(level) << "] ";
-	if (functionName.empty() == false)
+	if (functionName != nullptr && functionName[0] != '\0')
 	{
 		stream << '[' << functionName << "] ";
 	}
@@ -112,7 +113,7 @@ static void WriteConsoleRecord(LogLevel level, const std::string& record)
 		}
 		std::wstring wideRecord(static_cast<std::size_t>(characterCount), L'\0');
 		if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, record.data(), byteCount,
-			wideRecord.data(), characterCount) != characterCount)
+			&wideRecord[0], characterCount) != characterCount)
 		{
 			return;
 		}
@@ -161,45 +162,92 @@ void Logger::FileCloser::operator()(std::FILE* file) const noexcept
 	}
 }
 
-ErrorCode Logger::Init(LogOutput output, LogLevel minimumLevel,
-	const std::filesystem::path& filePath)
+// 파일 경로는 UTF-8로 받고 Windows API 경계에서만 변환한다.
+static StatusCode PrepareLogFilePath(const std::string& path, OUT std::wstring& fullPath)
+{
+	if (path.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())
+		|| path.find('\0') != std::string::npos)
+	{
+		return StatusCode::SC_LOG_FILE_OPEN_FAILED;
+	}
+	const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+		path.c_str(), static_cast<int>(path.size()), nullptr, 0);
+	if (length == 0)
+	{
+		return StatusCode::SC_LOG_FILE_OPEN_FAILED;
+	}
+	std::wstring widePath(static_cast<std::size_t>(length), L'\0');
+	if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.c_str(),
+		static_cast<int>(path.size()), &widePath[0], length) != length)
+	{
+		return StatusCode::SC_LOG_FILE_OPEN_FAILED;
+	}
+	const DWORD capacity = GetFullPathNameW(widePath.c_str(), 0, nullptr, nullptr);
+	if (capacity == 0)
+	{
+		return StatusCode::SC_LOG_FILE_OPEN_FAILED;
+	}
+	std::vector<wchar_t> buffer(capacity);
+	const DWORD written = GetFullPathNameW(widePath.c_str(), capacity, buffer.data(), nullptr);
+	if (written == 0 || written >= capacity)
+	{
+		return StatusCode::SC_LOG_FILE_OPEN_FAILED;
+	}
+	fullPath.assign(buffer.data(), written);
+	const std::size_t separator = fullPath.find_last_of(L'\\');
+	if (separator != std::wstring::npos)
+	{
+		const std::size_t parentLength = separator == 2 && fullPath[1] == L':' ? 3 : separator;
+		const std::wstring parent = fullPath.substr(0, parentLength);
+		const int result = SHCreateDirectoryExW(nullptr, parent.c_str(), nullptr);
+		if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS)
+		{
+			return StatusCode::SC_LOG_DIRECTORY_CREATION_FAILED;
+		}
+		const DWORD attributes = GetFileAttributesW(parent.c_str());
+		if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+		{
+			return StatusCode::SC_LOG_DIRECTORY_CREATION_FAILED;
+		}
+	}
+	return StatusCode::SC_SUCCESS;
+}
+
+StatusCode Logger::Init(LogOutput output, LogLevel minimumLevel,
+	const std::string& filePath)
 {
 	if (output != LogOutput::Console && output != LogOutput::File && output != LogOutput::Both)
 	{
-		return ErrorCode::EC_LOG_INVALID_OUTPUT;
+		return StatusCode::SC_LOG_INVALID_OUTPUT;
 	}
 	if (GetLevelName(minimumLevel) == nullptr)
 	{
-		return ErrorCode::EC_LOG_INVALID_LEVEL;
+		return StatusCode::SC_LOG_INVALID_LEVEL;
 	}
 	std::unique_ptr<std::FILE, FileCloser> newFile;
 	if (output != LogOutput::Console)
 	{
 		if (filePath.empty())
 		{
-			return ErrorCode::EC_LOG_EMPTY_FILE_PATH;
+			return StatusCode::SC_LOG_EMPTY_FILE_PATH;
 		}
-		std::error_code error;
-		const std::filesystem::path parentPath = filePath.parent_path();
-		if (parentPath.empty() == false)
+		std::wstring nativePath;
+		const StatusCode pathResult = PrepareLogFilePath(filePath, nativePath);
+		if (pathResult != StatusCode::SC_SUCCESS)
 		{
-			std::filesystem::create_directories(parentPath, error);
-			if (error.value() != 0)
-			{
-				return ErrorCode::EC_LOG_DIRECTORY_CREATION_FAILED;
-			}
+			return pathResult;
 		}
-		newFile.reset(_wfsopen(filePath.c_str(), L"ab", _SH_DENYNO));
+		newFile.reset(_wfsopen(nativePath.c_str(), L"ab", _SH_DENYNO));
 		if (newFile == nullptr)
 		{
-			return ErrorCode::EC_LOG_FILE_OPEN_FAILED;
+			return StatusCode::SC_LOG_FILE_OPEN_FAILED;
 		}
 	}
 	const std::lock_guard<std::mutex> lock(_mutex);
 	_file.swap(newFile);
 	_minimumLevel = minimumLevel;
 	_isConsoleEnabled = output != LogOutput::File;
-	return ErrorCode::EC_SUCCESS;
+	return StatusCode::SC_SUCCESS;
 }
 
 void Logger::SetMinimumLevel(LogLevel minimumLevel)
@@ -212,7 +260,7 @@ void Logger::SetMinimumLevel(LogLevel minimumLevel)
 	_minimumLevel = minimumLevel;
 }
 
-void Logger::Log(LogLevel level, std::string_view message, std::string_view functionName)
+void Logger::Log(LogLevel level, const std::string& message, const char* functionName)
 {
 	if (GetLevelName(level) == nullptr)
 	{
@@ -226,7 +274,7 @@ void Logger::Log(LogLevel level, std::string_view message, std::string_view func
 	WriteRecord(level, functionName, message);
 }
 
-void Logger::Write(LogLevel level, std::string_view functionName, const char* format, ...)
+void Logger::Write(LogLevel level, const char* functionName, const char* format, ...)
 {
 	if (GetLevelName(level) == nullptr || format == nullptr)
 	{
@@ -248,7 +296,7 @@ void Logger::Write(LogLevel level, std::string_view functionName, const char* fo
 	WriteRecord(level, functionName, message);
 }
 
-void Logger::WriteRecord(LogLevel level, std::string_view functionName, std::string_view message)
+void Logger::WriteRecord(LogLevel level, const char* functionName, const std::string& message)
 {
 	const std::string record = MakeRecord(level, functionName, message);
 	if (record.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))

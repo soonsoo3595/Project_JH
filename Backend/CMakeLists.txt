@@ -7,6 +7,7 @@ if(NOT WIN32 OR NOT MSVC)
 endif()
 
 add_library(jh_backend_options INTERFACE)
+# 빌드 설정은 C++17로 유지하고 직접 작성하는 코드는 C++11 범위로 제한한다.
 target_compile_features(jh_backend_options INTERFACE cxx_std_17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 target_compile_definitions(jh_backend_options INTERFACE WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -14,8 +15,14 @@ target_compile_definitions(jh_backend_options INTERFACE WIN32_LEAN_AND_MEAN NOMI
 target_compile_options(jh_backend_options INTERFACE /W4 /permissive- /utf-8)
 
 add_library(jh_backend_core STATIC
-    Core/ErrorCode.cpp
-    Core/ErrorCode.h
+    Core/Types.h
+    Core/Container.h
+    Core/NetAddress.cpp
+    Core/NetAddress.h
+    Core/SocketUtils.cpp
+    Core/SocketUtils.h
+    Core/StatusCode.cpp
+    Core/StatusCode.h
     Core/CoreGlobal.cpp
     Core/CoreGlobal.h
     Core/Logger.cpp
@@ -24,7 +31,7 @@ add_library(jh_backend_core STATIC
     Core/WinsockRuntime.h
 )
 target_include_directories(jh_backend_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(jh_backend_core PUBLIC jh_backend_options PRIVATE ws2_32)
+target_link_libraries(jh_backend_core PUBLIC jh_backend_options PRIVATE ws2_32 shell32)
 
 add_executable(jh_backend_server Server/Main.cpp)
 target_link_libraries(jh_backend_server PRIVATE jh_backend_core)
@@ -39,6 +46,12 @@ endforeach()
 include(CTest)
 if(BUILD_TESTING)
     # 로컬 테스트 소스는 Git에 포함하지 않는다.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/NetworkTests.cpp")
+        add_executable(jh_backend_network_tests Tests/NetworkTests.cpp)
+        target_link_libraries(jh_backend_network_tests PRIVATE jh_backend_core)
+        add_test(NAME backend_network_basics COMMAND jh_backend_network_tests)
+        set_tests_properties(backend_network_basics PROPERTIES TIMEOUT 15)
+    endif()
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/LoggerTests.cpp"
         AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/LoggerCaller.cpp")
         add_executable(jh_backend_logger_tests Tests/LoggerTests.cpp Tests/LoggerCaller.cpp)
