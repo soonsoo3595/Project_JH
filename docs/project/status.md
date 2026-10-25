@@ -1,9 +1,13 @@
 # Project JH 현재 상태
 
-최종 갱신: 2026-10-24 (Asia/Seoul)
+최종 갱신: 2026-10-26 (Asia/Seoul)
 상태 관리: 현재 PM 채팅
 
 ## 현재 단계
+
+2026-10-25 사용자 요청으로 ErrorCode를 StatusCode, EC_를 SC_, GetErrorMessage를 GetStatusMessage로 변경 완료했다. 아래 현재 API 표기는 새 명칭을 기준으로 하며 16개 항목의 값(0, 100~104, 200~209)·동작·C++11 사용 범위와 nodiscard 미사용을 유지한다. 검증 이력의 옛 명칭은 당시 상태를 나타낸다.
+
+최신 사용자 결정으로 빌드 설정은 C++17을 유지하되 직접 작성하는 코드는 C++11 범위로 제한하고 기존 코드도 전환한다. 백엔드 세션이 string_view·filesystem·nodiscard·가변 string::data 사용 등을 정리 완료했다. NetAddress는 const String&, Logger는 const std::string&·const char*를 사용한다. 로거 파일 경로는 UTF-8 const std::string&로 받고 내부 Windows UTF-16·절대 경로 변환과 SHCreateDirectoryExW/GetFileAttributesW/_wfsopen으로 처리한다. shell32 링크와 PCH Shell 헤더를 추가했으며 경로 길이 제한은 Backend/README.md를 따른다. 아래 이전 구현·nodiscard 적용 기록은 전환 전 상태다.
 
 백엔드 기반을 먼저 검증한 뒤 UE를 연동한다. 사용자가 백엔드 기본 템플릿 구현을 명시적으로 요청하여 `build/backend-template` 브랜치에 최소 빌드·실행 기반을 구성했다. 별도 코드 리뷰·QA 요청이나 다음 네트워크 기능 구현으로 범위를 확대하지 않는다.
 
@@ -17,7 +21,20 @@
 
 ## 확정한 사항
 
-- 사용자 요청으로 테스트 소스를 로컬 전용으로 관리한다. `/Backend/Tests/`를 Git에서 제외하고 기존 로컬 파일은 보존했다. `Backend/TestClient/`는 계속 버전 관리 대상이다. 로거 테스트는 `Tests/LoggerTests.cpp`·`LoggerCaller.cpp`가 모두 있을 때만 CMake에 등록한다. 로컬 소스가 있으면 CTest 3개, 없으면 서버·클라이언트 시작 검사 2개가 등록된다.
+- 2026-10-26 사용자 요청으로 출력·갱신 참조에 out 접두사 대신 OUT을 적용했다. Types.h에 미정의 시 빈 매크로를 제공하며 SocketUtils의 소켓 생성·주소 조회·종료와 Logger 내부 출력 참조에 적용했다. 읽기 전용 입력 참조에는 사용하지 않으며 입출력 인자의 기존 값 조건은 주석을 따른다.
+- SocketUtils에 `SetReuseAddress(SOCKET, bool)`를 추가했다. SO_REUSEADDR을 Bind 전에 명시적으로 설정하며 자동 활성화하지 않는다. 주소 독점 옵션은 유지하고 두 옵션을 동시에 활성화하지 않는다. Windows의 중복 바인딩 의미는 README를 따르며 OS 설정 실패는 기존 SC_NET_SOCKET_OPTION_FAILED로 반환한다.
+
+- 2026-10-25 사용자 요청으로 NetAddress 생성자는 포트 인자 없는 `NetAddress() noexcept`로 정리했다. 멤버 값 초기화로 IP·포트는 0이고 생성자는 sin_family=AF_INET만 설정한다. 기본 주소는 0.0.0.0:0이며 실제 IP·포트는 SetAddress로 지정한다. 설정 실패 시 기존 값 보존 계약은 유지한다. 백엔드 보고 기준 Debug·Release 빌드 및 기존 backend_network_basics 각 1/1이 통과했다. 전체 CTest·새 테스트·F5·별도 리뷰·QA·커밋은 미수행이며 PM은 생성자 선언·구현·README만 대조했다.
+
+- 사용자 요청으로 `Core/NetAddress.h·cpp`와 `SocketUtils.h·cpp`를 추가했다. NetAddress는 IPv4 숫자 주소·포트 설정/조회·sockaddr_in 변환을 지원하며 기본은 0.0.0.0:0, 설정 실패 시 기존 주소를 보존한다. DNS·IPv6는 미지원이다. SocketUtils는 IPv4 TCP overlapped·상속 금지 소켓 생성, TCP_NODELAY·주소 독점·송수신 버퍼 설정, Bind·Listen·GetLocalAddress·CloseSocket을 제공한다. 열린 출력 핸들 덮어쓰기를 거부하며 닫기 성공 시 INVALID_SOCKET으로 복원하고 반복 종료는 성공 처리한다. 소켓 소유권은 호출자에게 있고 소켓 정리 후 WinsockRuntime을 종료한다. 네트워크 오류는 200~299 구간 중 200~209를 정의했다. 제품 진입점은 여전히 초기화 후 종료하며 IOCP·실제 제품 연결 흐름은 미구현이다.
+
+- 사용자 요청으로 `Core/Container.h`에 Array·Vector·List·Map·Set·Deque·Queue·Stack·PriorityQueue·HashMap·HashSet·String을 추가하고 CMake·PCH·README에 연결했다. 표준 할당자를 사용하며 Array 크기는 std::size_t, String은 기존 UTF-8 규칙의 std::string이다. 비교자·해시·기반 컨테이너 인자를 지원한다. 커스텀 Allocator·wchar_t String은 도입하지 않았고 자동 동기화·인코딩 변환은 제공하지 않는다. 백엔드 보고 기준 Debug·Release 빌드와 기존 CTest 각 3/3 및 diff 공백 검사를 통과했다. PM은 헤더·연결 문서를 대조했고 빌드·실행은 재수행하지 않았다. 새 테스트·F5·별도 리뷰·QA·커밋은 미수행이다.
+
+- 사용자 제공 참고에 따라 `Types.h`에 표준 스레드 별칭 `Atomic<T>`·`Mutex`·`CondVar`·`UniqueLock`·`LockGuard`를 추가했다. atomic·condition_variable·mutex 헤더를 직접 포함한다. BYTE는 Windows 타입을 유지하며 미구현 클래스의 Ref 선언·USING_SHARED_PTR와 축소 캐스팅 size/len 매크로는 도입하지 않았다. 백엔드 보고 기준 이 추가 후 Debug·Release 빌드와 기존 CTest 각 3/3이 통과했다. PM은 타입 헤더 제공 목록을 확인했고 빌드·실행은 재수행하지 않았다. 새 테스트·F5·별도 리뷰·QA·커밋은 미수행이다.
+
+- 사용자 요청으로 `Backend/Core/Types.h`에 `int8/16/32/64`·`uint8/16/32/64`·`float32/64`를 정의했다. CMake Core 소스 목록과 PCH에 연결했고 `StatusCode.h`가 직접 include하여 기반 타입을 int32로 사용한다. 오류 항목·번호는 유지했다. bool·char·std::size_t·문자열·포인터·Windows API 원본 타입은 유지하며 도메인 ID를 미리 추가하지 않았다.
+
+- 사용자 요청으로 테스트 소스를 로컬 전용으로 관리한다. `/Backend/Tests/`를 Git에서 제외하고 기존 로컬 파일은 보존했다. `Backend/TestClient/`는 계속 버전 관리 대상이다. 로거 테스트는 `Tests/LoggerTests.cpp`·`LoggerCaller.cpp`가 모두 있을 때, 네트워크 검사는 `Tests/NetworkTests.cpp`가 있을 때 CMake에 등록한다. 현재 로컬 테스트 소스가 모두 있으면 CTest 4개, 없으면 서버·클라이언트 시작 검사 2개가 등록된다.
 
 - 2026-10-24 사용자 요청으로 `Backend/Core/Logger.h·cpp`의 공통 로거를 구현했다. 두 진입점은 직접 출력과 코드 페이지 설정 대신 로거를 사용한다. 현재 동작과 사용법은 [Backend/README.md](../../Backend/README.md)의 공통 로거 항목을 따른다.
 - 같은 날 사용자 확정에 따라 전역 로거·`Init`·`LOG_*` 매크로 구조로 변경했다. `CoreGlobal.h·cpp`의 객체가 자동 소유하며 재할당 불가 `GLogger` 포인터로 접근한다. 두 진입점은 `GLogger->Init(LogOutput::Console/File/Both, 최소 레벨, 선택 파일 경로)`로 설정한다. 재초기화 성공 시 설정을 직렬화해 교체하고 실패하면 기존 설정을 유지한다. 기존 `LoggerOptions`·`Log()`와 지역 인스턴스 사용도 유지한다.
@@ -25,14 +42,14 @@
 - `Write()`와 매크로는 UTF-8 printf 형식을 지원하고 `LOG_TRACE/DEBUG/INFO/WARNING/ERROR/FATAL`은 호출 함수명을 자동 기록한다. Release에서는 Trace·Debug 매크로만 인자 평가 없이 제거하고 Info 이상은 최소 레벨에 따라 유지한다. 직접 `Write()`·`Log()` 호출에는 이 컴파일 단계 제거가 적용되지 않는다. 전역 로거를 수동 삭제하지 않으며 모든 워커를 main 종료 전에 합류시키고 전역 객체 생성자·소멸자에서는 로그를 호출하지 않는다.
 - 로거 enum 두 이름만 using으로 노출한 단계 이후, 사용자 요청으로 프로젝트 전반의 자체 namespace 제거를 완료했다. 직접 작성한 C++ 소스·헤더 11개에서 `jh`·`jh::detail`·익명 namespace와 using 별칭·`using namespace std`를 제거했다. 파일 내부 전용 함수·객체는 static, Release 무동작 함수는 `SkipLogForRelease` inline으로 유지한다. 표준 라이브러리의 `std::`와 외부·생성 코드의 namespace는 유지한다.
 - 로거는 Trace·Debug·Info·Warning·Error·Fatal, 최소 레벨 필터와 실행 중 변경, 콘솔·파일 선택 및 동시 출력을 지원한다. 날짜·시간·밀리초·레벨을 기록하며 인스턴스별 mutex로 동기식 출력을 보호한다. 파일은 UTF-8 append와 레코드별 flush, 실제 콘솔은 UTF-16 변환 후 `WriteConsoleW`, 리다이렉션은 UTF-8 바이트 출력을 사용한다. 콘솔 코드 페이지는 변경하지 않는다. Error·Fatal은 stderr로 출력하고 Fatal 자체는 종료를 수행하지 않는다.
-- 서버·테스트 클라이언트의 파일 로그는 실행 작업 디렉터리 기준 `logs/backend-server.log`·`logs/backend-test-client.log`다. `logs/`는 Git에서 제외한다. 사용자 의도에 맞춰 로거를 단순화하여 `Init()`만 `[[nodiscard]] ErrorCode`, `SetMinimumLevel()`·`Log()`·`Write()`·로그 매크로는 void로 변경했다. 개별 출력 반환값 검사와 원본 category/value 출력은 제거했다. 초기화 실패 시 기존 설정을 보존하고 두 진입점은 실패 로그 후 종료 코드 1을 반환한다. 콘솔 실패와 관계없이 파일 기록을 시도하고 파일 쓰기 실패는 stderr에 짧게 알린다. 가변 인수 목록과 FILE 핸들은 RAII로 정리한다.
-- 업무상 실패를 판단할 작업에 공통 `ErrorCode : int`를 사용하며 단순 로그 출력과 구분한다. `Core/ErrorCode.h·cpp`는 `EC_SUCCESS=0`과 한국어 `GetErrorMessage()`를 제공한다. 최신 사용자 요청으로 항목 이름을 EC_ 대문자 스네이크로 통일하고 종류별 번호 구간을 적용했다. 로거는 100~199 구간이며 `EC_LOG_INVALID_LEVEL=100`, `EC_LOG_INVALID_OUTPUT=101`, `EC_LOG_EMPTY_FILE_PATH=102`, `EC_LOG_DIRECTORY_CREATION_FAILED=103`, `EC_LOG_FILE_OPEN_FAILED=104`다. 기존 초기화 오류 2~6은 이번 명시 요청으로 재배치했다. 이후 확정 번호를 다른 의미로 재사용하지 않으며 다른 종류의 구간은 해당 기능 구현 시 정한다. 상태 bool·값 조회·Winsock 원본 int 조회는 유지한다. `LoggerOptions`·`LoggerDiagnostics`와 개별 출력 오류 코드는 제거했다. 파일은 `_wfsopen` append binary와 unique_ptr 삭제자로 관리하며 UTF-8·동기식 보호·6레벨·함수명·Release 상세 매크로 제거는 유지한다.
+- 서버·테스트 클라이언트의 파일 로그는 실행 작업 디렉터리 기준 `logs/backend-server.log`·`logs/backend-test-client.log`다. `logs/`는 Git에서 제외한다. 사용자 의도에 맞춰 로거를 단순화하여 `Init()`만 StatusCode 반환, `SetMinimumLevel()`·`Log()`·`Write()`·로그 매크로는 void로 변경했다. 개별 출력 반환값 검사와 원본 category/value 출력은 제거했다. 초기화 실패 시 기존 설정을 보존하고 두 진입점은 실패 로그 후 종료 코드 1을 반환한다. 콘솔 실패와 관계없이 파일 기록을 시도하고 파일 쓰기 실패는 stderr에 짧게 알린다. 가변 인수 목록과 FILE 핸들은 RAII로 정리한다.
+- 업무상 실패를 판단할 작업에 공통 `StatusCode : int32`를 사용하며 단순 로그 출력과 구분한다. `Core/StatusCode.h·cpp`는 `SC_SUCCESS=0`과 한국어 `GetStatusMessage()`를 제공한다. 최신 사용자 요청으로 항목 이름을 SC_ 대문자 스네이크로 통일하고 종류별 번호 구간을 적용했다. 로거는 100~199 구간이며 `SC_LOG_INVALID_LEVEL=100`, `SC_LOG_INVALID_OUTPUT=101`, `SC_LOG_EMPTY_FILE_PATH=102`, `SC_LOG_DIRECTORY_CREATION_FAILED=103`, `SC_LOG_FILE_OPEN_FAILED=104`다. 기존 초기화 오류 2~6은 이번 명시 요청으로 재배치했다. 이후 확정 번호를 다른 의미로 재사용하지 않으며 다른 종류의 구간은 해당 기능 구현 시 정한다. 상태 bool·값 조회·Winsock 원본 int 조회는 유지한다. `LoggerOptions`·`LoggerDiagnostics`와 개별 출력 오류 코드는 제거했다. 파일은 `_wfsopen` append binary와 unique_ptr 삭제자로 관리하며 UTF-8·동기식 보호·6레벨·함수명·Release 상세 매크로 제거는 유지한다.
 
 - 독립 C++17 Windows IOCP 백엔드, UE 클라이언트·Dedicated Server, MySQL을 기본 기술 방향으로 한다.
 - PC와 Android 사용자가 함께 플레이하는 크로스플레이를 지원한다. PC 버전을 먼저 완성한 뒤 Android를 지원한다.
 - PC 클라이언트는 Windows만 지원한다. 개발 환경은 사용자 전달 기준 Visual Studio 2026·UE 5.8이다. 실제 설치 및 빌드 호환성은 미검증이다.
 - CI는 GitHub Actions로 확정했다. 초기 범위는 GitHub 제공 Windows 실행 환경에서 백엔드 빌드·테스트 자동화다. 실제 워크플로 생성·실행은 수행하지 않았다.
-- 독립 백엔드는 CMake + vcpkg manifest 모드(`vcpkg.json`)로 구성했다. 외부 의존성 목록은 현재 비어 있다. 백엔드 세션 보고 기준 VS 2026 x64 Debug·Release 빌드와 각 구성의 CTest 3개(시작 검사 2개·로거 검사 1개)가 통과했다. UE는 Unreal 빌드 체계를 유지하며 이번에 검증하지 않았다.
+- 독립 백엔드는 CMake + vcpkg manifest 모드(`vcpkg.json`)로 구성했다. 외부 의존성 목록은 현재 비어 있다. 백엔드 세션 보고 기준 VS 2026 x64 Debug·Release 빌드와 각 구성의 CTest 4개(시작 검사 2개·로거 검사 1개·네트워크 기본 검사 1개)가 통과했다. UE는 Unreal 빌드 체계를 유지하며 이번에 검증하지 않았다.
 - 자체 백엔드 통신은 TCP + Protobuf를 사용한다. 프레이밍·스키마는 미확정이다.
 - 게임 플레이 흐름 및 구현 단계·완료 기준은 언제든 변경 가능한 초안이다.
 - 사용자는 단독 개발자이자 최종 의사결정자다. 현재 채팅은 PM 역할이며 역할별 세션은 필요할 때 확장한다.
@@ -57,7 +74,8 @@
 - 홈서버 참고 저장소는 [homeserver-infra](https://github.com/soonsoo3595/homeserver-infra)다. 저장소 문서에서 WSL2·Ubuntu 24.04 LTS 및 기존 Jenkins·PostgreSQL·Redis·Traefik·Cloudflare Tunnel 구성을 확인했다. 실제 서비스 실행 상태는 미검증이며 Project JH의 GitHub Actions·MySQL 선택은 유지한다.
 - 홈서버의 남은 SSD 용량·WSL 자원 제한·Windows 빌드 도구·UE 설치 상태 및 실제 성능은 미확인이다. 서버 접속이나 기존 서비스 변경은 수행하지 않았다.
 
-- 사용자 요청으로 2026-10-21에 로컬 Git을 재초기화했다. main·dev의 초기 커밋은 `d35ba04`이며 날짜별 로그는 포함하지 않았다. 현재 구현 체크아웃은 dev에서 분기한 `build/backend-template`이다. 템플릿 변경은 아직 커밋·병합하지 않았다. Git 버전은 `2.56.0.windows.1`이다.
+- 사용자 요청으로 2026-10-21에 로컬 Git을 재초기화했다. main·dev의 초기 커밋은 `d35ba04`이며 날짜별 로그는 포함하지 않았다. 현재 구현 체크아웃은 dev에서 분기한 `build/backend-template`이다. 2026-10-24 사용자 요청으로 Git 채팅이 세 로컬 커밋을 생성했다: `4cf2b32` 저장소 제외·인코딩 속성, `045638b` 백엔드 기반·로거 구현, `7ed7d56` 명세·개발 규약·상태 문서. push·PR·병합은 수행하지 않았다. Git 버전은 `2.56.0.windows.1`이다.
+- Git 채팅의 커밋 완료 직후와 PM의 후속 확인 시 작업 트리·스테이징은 깨끗했다. 이 완료 사실을 반영하는 현재 status.md 수정은 후속 미커밋 문서 변경이다. Git 보고 기준 두 Main.cpp·Pch.h의 해시는 커밋 전후 동일하며 로컬 테스트·산출물·실행 로그·날짜별 일지는 제외하고 TEMPLATE.md 추적을 유지했다. 커밋 정리 과정에서 빌드·테스트·별도 리뷰·QA는 재수행하지 않았다.
 - 초기 커밋은 main에 남기고 같은 기준에서 dev를 만들어 개발 기준으로 사용한다. 후속 변경은 dev에서 작업 브랜치를 분기한다. release는 배포 검증 시 구성한다.
 - GitHub 원격 저장소는 아직 연결하지 않았으며 push·PR·병합은 수행하지 않았다. Git LFS는 아직 설정하지 않았다.
 - 원격 저장소 이름·주소, 상세 브랜치·병합·보호 정책, Git LFS 적용 범위와 유료·비공개 에셋의 실제 제외 경로는 미확정이다.
@@ -73,6 +91,8 @@
 
 ## 검증 상태
 
+- 백엔드 세션의 2026-10-26 OUT·주소 재사용 옵션 완료 보고: Debug·Release 빌드와 CTest 각 4/4 통과. 실제 옵션 on/off 조회·설정 후 바인딩·독점 충돌 실패·무효 소켓 검사를 로컬 NetworkTests에 추가했다. 수정 소스 5개 BOM·CRLF, out 접두사 잔존 없음·공백 검사도 확인했다고 보고했다. PM은 공개 헤더·구현 연결·README를 대조했으며 빌드·실행은 재수행하지 않았다. F5·별도 C++14 재빌드·별도 리뷰·QA·커밋은 미수행이다.
+
 - 사용자 제공 [강의 IOCP 서버](https://github.com/soonsoo3595/Iocp_Server_MatchMaking)의 구조·세션·패킷·로그 경로를 읽고 [참고 정리](../architecture/iocp-course-reference.md)를 작성했다. 코드는 가져오지 않았으며 정식 리뷰·QA·실행 검증은 수행하지 않았다.
 - 읽은 자료: 프로젝트 개요, 사용자가 전달한 이전 프로젝트의 team.md·repository.md·coding-standards.md.
 - 수행: CMake 구성·vcpkg 빈 manifest 설치, MSVC Debug·Release 빌드, 각 구성의 CTest 시작 검사 2/2 통과, 직접 실행의 한국어 출력, 소스 BOM·Git 인코딩 속성 확인.
@@ -81,7 +101,9 @@
 - 콘솔 출력 수정의 백엔드 보고: 같은 임시 manifest 설치 비활성 조건에서 Debug·Release 빌드 및 각 CTest 시작 검사 2/2 통과. PTY에서 CP949를 지정한 후 두 Debug 프로그램의 한국어 출력·정상 종료 확인. 검증 후 캐시는 ON으로 복원했고 프리셋은 유지했다. Visual Studio F5 화면은 미확인이다.
 - 2026-10-23 PM 수행: UTF-8 BOM 전환 전후 소스 텍스트 동일성, Git 속성에서 인코딩 재변환 제거, 생성 프로젝트의 `/utf-8` 옵션을 확인했다. manifest 설치 ON으로 CMake 구성에 성공했고 PCH를 포함해 Debug·Release를 각각 새로 빌드한 뒤 각 CTest 시작 검사 2/2 통과를 확인했다. 사용자 실행 로직은 변경하지 않았고 Visual Studio F5 화면은 확인하지 않았다.
 - 백엔드 세션의 2026-10-24 보고: 콘솔 초기화 추가 후 Debug·Release 빌드와 각 CTest 시작 검사 2/2 통과. PTY에서 두 Debug 프로그램의 한국어 출력·정상 종료 및 소스 UTF-8 BOM·CRLF를 확인했다. Visual Studio F5 화면은 직접 확인하지 않았다. PM의 별도 빌드·실행·코드 리뷰·QA는 수행하지 않았다.
-- 미수행: 실제 네트워크 연결·IOCP·Protobuf·DB·UE 검증, GitHub Actions 실행, 별도 코드 리뷰·QA.
+- 미수행: 제품 진입점 간 네트워크 연결·IOCP·Protobuf·DB·UE 검증, GitHub Actions 실행, 별도 코드 리뷰·QA.
+- 백엔드 세션의 2026-10-24 네트워크 기본 유틸리티 완료 보고: Debug·Release 빌드·CTest 각 4/4 통과. 주소·인수 오류/보존·실제 소켓 옵션·핸들 상속 금지·생성 전후 조건·임시 포트 루프백 Bind/주소 조회·독점 중복 Bind 실패·Listen·테스트 내 실제 connect/accept·반복 종료를 확인했다. 제한 환경의 Release connect 오류 10013을 확인한 뒤 로컬 네트워크 허용 환경에서 두 구성을 통과했다. 네트워크 테스트는 로컬 Git 제외 대상이다. 소스 7개의 BOM·CRLF와 diff 공백 검사도 확인했다고 보고했다. PM은 공개 헤더·오류 정의·조건부 검사 등록·README를 대조했고 빌드·실행은 재수행하지 않았다. F5·제품 IOCP·Protobuf·DB·별도 리뷰·QA는 미수행이며 커밋하지 않았다.
+- 백엔드 세션의 2026-10-24 기본 타입 정의 완료 보고: manifest ON Debug·Release 빌드와 기존 CTest 각 3/3 통과, 수정 헤더 3개의 UTF-8 BOM·CRLF 확인. 새 테스트·F5·별도 리뷰·QA는 미수행이다. PM은 타입 헤더·ErrorCode·PCH·CMake·README를 대조하고 빌드·실행은 재수행하지 않았다. 커밋하지 않았다.
 - 백엔드 세션의 2026-10-24 테스트 로컬 전용 처리 보고: 두 테스트 소스의 Git 제외·미추적 확인, manifest ON Debug 빌드와 CTest 3/3 통과. Tests를 제외해 ignored out에 복사한 별도 소스 구성에서는 vcpkg 없이 Debug 빌드·시작 검사 2/2 통과. 이 후속 변경의 Release·F5·별도 리뷰·QA는 미수행이다. PM은 제외 경로·조건부 타깃·README만 대조하고 빌드·실행은 재수행하지 않았다.
 - 백엔드 세션의 2026-10-24 로거 단순화 완료 보고: Debug·Release 빌드와 각 CTest 3/3 통과, 실제 콘솔 한글 출력·코드 페이지 불변, 소스 8개의 UTF-8 BOM·CRLF 확인. F5·별도 리뷰·QA는 미수행이다. PM은 현재 헤더·README의 반환 계약을 대조했으며 빌드·실행은 재수행하지 않았다. 이전 ErrorCode·공개 진단 검증 기록은 단순화 전 이력이다.
 - 백엔드 세션의 2026-10-24 ErrorCode 적용 완료 보고: Debug·Release 빌드와 각 CTest 3/3 통과. 파일 byte-range 잠금으로 파일 단독·양쪽 출력 실패 및 원본 오류 보존을 확인했다. 두 구성×두 프로그램×디렉터리 생성/파일 열기 실패의 실행 8건에서 코드 5/6·원본 오류·종료 코드 1을 확인했다. 실제 콘솔 한글·코드 페이지 불변, UTF-8 BOM·CRLF 및 try/catch/직접 throw 없음도 확인했다고 보고했다. PM은 헤더 API·README 대조만 수행했고 빌드·실행은 재수행하지 않았다. F5·별도 리뷰·QA는 미수행이다.
@@ -92,3 +114,9 @@
 - 백엔드 세션의 같은 날 전역 로거 변경 완료 보고: Debug·Release 빌드 및 각 CTest 3/3 통과. 다른 번역단위의 전역 공유, 포맷·함수명·8192문자 기록, Release 상세 매크로 인자 미평가·Info 유지, 재초기화 실패 복구·출력 교체와 기존 테스트를 확인했다. 실제 콘솔의 전역 Write·매크로·서버 한글 출력과 코드 페이지 불변도 확인했다고 보고했다. F5·네트워크·별도 리뷰·QA는 미수행이며 PM은 문서·전역 객체 선언의 반영 상태만 대조하고 빌드·실행을 재수행하지 않았다.
 
 - 백엔드 세션의 2026-10-24 오류 코드 명명·번호 구간 변경 보고: Debug·Release 빌드와 각 CTest 3/3 통과, 이전 열거 이름 잔존 없음 및 수정 소스 6개의 UTF-8 BOM·CRLF 확인. PM은 오류 코드 선언·README를 대조했으며 빌드·실행은 재수행하지 않았다. 새 테스트·F5·별도 리뷰·QA는 미수행이다.
+
+- 백엔드 세션의 2026-10-24 결과 무시 경고 정책 변경: 함수별 속성을 제거하고 enum class [[nodiscard]] ErrorCode : int32에 한 번 적용했다. 결과 확인 요구는 유지한다. Debug·Release 빌드·CTest 각 4/4 통과 및 임시 컴파일 프로브에서 결과 무시 C4834·결과 비교 정상 컴파일을 확인했다고 보고했다. PM은 타입 선언·공개 헤더·README를 대조하고 빌드·실행은 재수행하지 않았다. WinsockRuntime 소유권은 유지하고 AcceptEx·ConnectEx·DisconnectEx는 IOCP 단계로 남겼다. 새 영구 테스트·F5·별도 리뷰·QA·커밋은 미수행이다.
+
+- 백엔드 세션의 2026-10-24 C++11 범위 전환 완료 보고: 원본 C++17 설정 Debug·Release 빌드와 CTest 각 4/4 통과, 실제 콘솔 한글·코드 페이지 불변, 수정 소스 8개의 BOM·CRLF·공백 검사와 C++17 기능 및 try/catch/직접 throw 잔존 검색을 확인했다. MSVC의 최저 지원 C++14 모드로 별도 복사본 Debug 빌드·CTest 4/4도 통과했다. 엄격한 C++11 모드 컴파일은 미수행이다. 사용자 PCH·using namespace std 변경은 보존하고 SDK byte 충돌은 Shell 헤더를 해당 using 전에 포함해 해결했다고 보고했다. PM은 공개 API·CMake·README를 대조하고 빌드·실행은 재수행하지 않았다. F5·별도 리뷰·QA·커밋은 미수행이다.
+
+- 백엔드 세션의 2026-10-25 StatusCode 전환 완료 보고: Debug·Release 빌드·CTest 각 4/4 통과. NetAddress.h의 winsock2 직접 include를 보완해 PCH 없는 네트워크 검사 빌드를 해결했다. 이전 API 명칭 잔존 없음·소스 BOM/CRLF·diff 공백 검사·Tests Git 제외 확인. PM은 새 타입 선언과 이전 API 이름 검색만 대조했으며 빌드·실행은 재수행하지 않았다. 이번 변경의 별도 C++14 재검증·F5·IOCP·별도 리뷰·QA·커밋은 미수행이다.
