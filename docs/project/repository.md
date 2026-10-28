@@ -1,6 +1,6 @@
 # Project JH 저장소와 작업 관리
 
-최종 갱신: 2026-10-24 (Asia/Seoul)
+최종 갱신: 2026-10-29 (Asia/Seoul)
 
 ## 현재 결정 상태
 
@@ -38,6 +38,8 @@ GitHub 공개 단일 저장소에서 백엔드·UE 프로젝트·문서를 함�
 원격 저장소 이름·주소, 작업 브랜치 이름, release 브랜치 구성, 병합 방식·보호 정책은 미확정이다. 이전 프로젝트의 상세 설정을 자동 승계하지 않는다.
 
 ## 빌드 자동화 방향
+
+- 사용자 위임에 따라 백엔드 세션이 사용자 코드에 맞춘 CMake 소스·타깃 등록과 StatusCode 관리를 담당한다. 관련 빌드·검사는 백엔드에서 수행하고 전체 상태는 PM이 반영한다. Git 커밋·원격·PR 작업은 등록된 Git 채팅과 기존 사용자 요청 범위에 따라 조율한다.
 
 - 독립 백엔드는 CMake로 빌드하고 외부 C++ 라이브러리는 vcpkg manifest 모드의 `vcpkg.json`으로 관리한다. UE는 Unreal 빌드 체계를 사용하며 이번 결정으로 UE 빌드를 CMake로 전환하지 않는다.
 - `Backend/`에 CMakeLists·VS 2026 x64 Debug/Release 프리셋·vcpkg 빈 manifest를 구성했다. CMake 최소 버전은 4.2다. 실제 외부 의존성을 추가할 때 vcpkg baseline과 패키지 버전 고정 정책을 정한다.

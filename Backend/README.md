@@ -1,13 +1,13 @@
 # 백엔드 기본 템플릿
 
-Windows IOCP 백엔드를 만들기 위한 실행 기반이다. 빌드 설정은 C++17로 유지하고 직접 작성하는 코드는 C++11의 문법·표준 라이브러리 범위로 제한한다. 현재 서버·테스트 클라이언트 모두 Winsock 초기화 후 메시지를 출력하고 종료한다. IPv4 주소와 TCP 소켓 기본 함수는 준비했으며 제품의 접속 처리·IOCP·Protobuf 송수신·MySQL은 아직 구현하지 않았다.
+Windows IOCP 백엔드를 만들기 위한 실행 기반이다. 빌드 설정은 C++17로 유지하고 직접 작성하는 코드는 C++11의 문법·표준 라이브러리 범위로 제한한다. 현재 서버·테스트 클라이언트 모두 Winsock 초기화 후 메시지를 출력하고 종료한다. IPv4 주소·TCP 소켓 함수와 IOCP 완료 큐 기본 기능은 준비했으며 제품의 접속·송수신 흐름·Protobuf·MySQL은 아직 구현하지 않았다.
 
 ## 구성
 
-- `Core/`: Winsock 초기화·해제, IPv4 주소·TCP 소켓 기본 함수, 공통 타입·오류 코드·로거를 제공하는 라이브러리. WinsockRuntime은 복사·이동을 금지해 초기화와 해제 횟수를 맞춘다.
+- `Core/`: Winsock 초기화·해제, IPv4 주소·TCP 소켓·IOCP 기본 기능, 공통 타입·상태 코드·로거를 제공하는 라이브러리. WinsockRuntime은 복사·이동을 금지해 초기화와 해제 횟수를 맞춘다.
 - `Server/`: `jh_backend_server` 실행 진입점.
 - `TestClient/`: `jh_backend_test_client` 실행 진입점.
-- `Tests/`: 로거·네트워크 기본 기능을 확인하는 로컬 전용 테스트. Git에서 제외한다.
+- `Tests/`: 로거·네트워크·IOCP 기본 기능을 확인하는 로컬 전용 테스트. Git에서 제외한다.
 - `vcpkg.json`: manifest 모드 의존성 목록. 현재는 외부 의존성 없이 비워 두었으며 Protobuf는 통신 구현 시 추가한다.
 - `CMakePresets.json`: VS 2026 x64 구성과 Debug·Release 빌드·CTest 실행 설정.
 
@@ -26,7 +26,7 @@ cmake --build --preset windows-release
 ctest --preset windows-release
 ```
 
-실행 파일은 `out/build/windows-vs2026/Debug/` 또는 `Release/`에 생성된다. CTest에는 서버·클라이언트 시작 검사 2개가 등록되며, 로컬 `Tests/` 소스가 있으면 로거·네트워크 기본 검사를 각각 추가해 현재 총 4개가 된다. 테스트 소스가 없는 체크아웃에서도 빌드할 수 있다. 두 시작 검사는 실제 프로그램 실행·Winsock 초기화·정상 종료만 확인한다. 네트워크 기본 검사는 검사 프로세스 안의 루프백 연결이며 제품의 IOCP 접속·송수신 검증과 구분한다.
+실행 파일은 `out/build/windows-vs2026/Debug/` 또는 `Release/`에 생성된다. CTest에는 서버·클라이언트 시작 검사 2개가 등록되며, 로컬 `Tests/` 소스가 있으면 로거·네트워크·IOCP 검사를 각각 추가해 현재 총 5개가 된다. 테스트 소스가 없는 체크아웃에서도 빌드할 수 있다. 새 로컬 검사 소스를 추가하면 CMake 구성을 다시 실행한다. 두 시작 검사는 실제 프로그램 실행·Winsock 초기화·정상 종료만 확인한다. 네트워크·IOCP 검사는 검사 프로세스 안의 루프백 소켓을 사용하며 제품의 접속·송수신 흐름 검증과 구분한다.
 
 ## 언어 사용 기준
 
@@ -62,11 +62,44 @@ ctest --preset windows-release
 - `Bind()`, `Listen()`: 주소 바인딩과 연결 대기 설정. 포트 0으로 바인딩하면 OS가 빈 포트를 할당하며 `GetLocalAddress()`로 확인한다.
 - `CloseSocket(SOCKET&)`: 소켓 닫기. 성공하면 `INVALID_SOCKET`으로 바꾸고 이미 무효인 소켓에는 성공을 반환한다. 실패하면 기존 값을 유지한다.
 
-작업 결과는 공통 `StatusCode`의 네트워크 구간 200~299 중 현재 200~209로 반환한다. Winsock API 자체가 실패한 경우 원본 번호가 필요하면 반환 직후 `WSAGetLastError()`를 읽는다. 인수 검증 실패에는 원본 Winsock 오류를 새로 설정하지 않는다. 공개 진단 구조체나 내부 로그 출력은 추가하지 않았다.
+작업 결과는 공통 `StatusCode`의 네트워크 관련 항목으로 반환한다. Winsock API 자체가 실패한 경우 원본 번호가 필요하면 반환 직후 `WSAGetLastError()`를 읽는다. 인수 검증 실패에는 원본 Winsock 오류를 새로 설정하지 않는다. 공개 진단 구조체나 내부 로그 출력은 추가하지 않았다.
 
 `WinsockRuntime` 초기화 성공 후 소켓을 만들고, 모든 소켓을 정리한 뒤 런타임을 소멸시킨다. 소켓 소유권은 호출자에게 있으며 복사한 핸들을 각각 닫지 않는다. 같은 소켓의 종료와 다른 호출을 동시에 수행하지 않는다. 향후 비동기 I/O를 붙일 때 `CloseSocket()` 성공을 I/O 완료·세션 해제와 동일하게 취급하지 않는다. 현재 이 유틸리티는 IOCP 등록·접속 수락·연결·송수신을 수행하지 않는다.
 
 구현 근거: Microsoft의 [WSASocketW](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasocketw), [주소 재사용·독점 옵션](https://learn.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse), [closesocket](https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-closesocket) 문서.
+
+## IOCP 기본 기능
+
+`Core/IocpCore.h`는 완료 포트 핸들을 소유하는 `IocpCore`와 등록 객체의 인터페이스 `IocpObject`를 제공한다. `Core/IocpEvent.h`는 `OVERLAPPED`를 상속한 이벤트를 정의한다. 필요한 소스에서 직접 포함하며 전역 객체나 워커 풀을 생성하지 않는다.
+
+| 함수 | 역할 |
+| --- | --- |
+| 생성자 | 내부 `Init()`으로 완료 포트를 생성한다. 동시 실행 수는 OS 기본값이며 워커를 생성하지 않는다. 생성 후 `IsInitialized()`를 확인한다. |
+| `Register(iocpObject)` | 객체의 `GetHandle()`을 포트에 연결한다. 널 객체와 무효 핸들을 거부하며 소켓을 소유하거나 닫지 않는다. |
+| `Dispatch(timeoutMs = INFINITE)` | 완료 패킷 하나를 기다려 이벤트의 소유 객체에 전달한다. 0ms는 즉시 확인한다. |
+| 소멸자 | 내부 `Close()`로 완료 포트만 해제한다. 남은 I/O 완료 처리와 워커 합류를 먼저 마쳐야 한다. |
+| `IsInitialized()` | 현재 핸들 보유 여부 조회. |
+
+`IocpObject`는 `GetHandle()`과 `Dispatch(IocpEvent*, DWORD numOfBytes, DWORD error)`를 구현한다. 바이트 수와 오류는 Windows 원본 타입으로 전달한다. `error == ERROR_SUCCESS`이면 정상 완료이며 취소·실패 완료도 같은 콜백으로 전달하므로 해당 작업과 버퍼를 정리해야 한다. 객체 콜백 호출 후 `IocpCore::Dispatch()`의 반환값은 다음처럼 구분한다.
+
+- `SC_SUCCESS`: 정상 완료를 전달했다. 이벤트 없는 수동 알림은 콜백 없이 성공으로 처리한다.
+- `SC_IOCP_IO_FAILED`: 실패한 I/O의 완료를 원본 오류와 함께 객체에 전달했다. 반환값 확인 후 같은 작업을 다시 정리하지 않는다.
+- `SC_IOCP_WAIT_TIMEOUT`: 완료 패킷 없이 제한 시간이 지났다. 콜백을 호출하지 않는다.
+- `SC_IOCP_WAIT_FAILED`: 완료 패킷 없이 대기 자체가 실패했다. 콜백을 호출하지 않으며 원본 오류는 반환 직후 `GetLastError()`로 확인한다.
+- `SC_IOCP_INVALID_OBJECT`: 등록 객체가 널이거나 완료 이벤트의 소유 객체가 없다. 후자는 I/O 요청 전 소유자 설정 누락에 해당한다.
+- `SC_IOCP_NOT_INITIALIZED`: 생성자에서 포트 생성에 실패했다.
+
+IOCP 결과는 공통 `StatusCode`의 IOCP 관련 항목으로 구분한다. `Register()`의 Windows API 실패 원인이 필요하면 반환 직후 `GetLastError()`를 확인한다. 인수·상태 검사에는 새 Windows 오류를 설정하지 않는다. `WSA_IO_PENDING`은 비동기 요청을 시작할 때 확인하는 값이므로 완료 대기 결과의 상태 코드로 추가하지 않는다.
+
+I/O 요청 전 `IocpEvent::SetOwner()`로 소유 객체를 설정하고 완료 처리까지 이벤트·버퍼의 주소와 수명을 유지한다. 이벤트는 복사·이동하지 않는다. `Init()`은 이전 완료 처리 후 `OVERLAPPED` 영역만 초기화하며 종류와 소유 참조는 유지한다. 요청이 즉시 실패하고 완료 통지가 발생하지 않는 경우에는 호출자가 `SetOwner(nullptr)`로 참조를 해제한다. 소켓 종료나 취소 요청만으로 이벤트를 해제하지 않는다.
+
+완료를 받으면 이벤트의 소유 참조를 콜백 직전에 해제하고 지역 `shared_ptr`로 콜백 동안 객체 수명을 유지한다. 객체가 이벤트를 멤버로 소유해도 완료 후 순환 참조가 남지 않게 하며 콜백이 다음 I/O를 시작한다면 소유자를 다시 설정해야 한다. 콜백 이후에는 이벤트를 다시 접근하지 않는다. 객체 내부 상태와 같은 이벤트의 재사용은 호출자가 동기화해야 한다.
+
+새 I/O 중지와 남은 완료 처리, 워커 합류를 마친 뒤 포트를 소멸시킨다. 생성·소멸과 다른 호출을 동시에 수행하지 않는다. 현재 수동 알림 등록 API는 없으므로 워커 종료는 유한한 대기 시간과 별도 종료 조건 등으로 구성해야 한다. 제품 워커는 아직 구현하지 않았다.
+
+현재 `IocpEvent` 기반 완료 분배까지 제공한다. `Listener`, `Session`, `AcceptEx` 로딩, 제품의 비동기 송수신 흐름은 다음 단계다. 로컬 검사는 입력 검증·이벤트 초기화·타임아웃, 실제 루프백 `WSARecv` 완료·취소, 다른 포트 중복 등록 실패, 소유자 누락 처리·콜백에서의 소유 참조 재설정·완료 후 객체 소멸을 확인한다.
+
+구현 근거: Microsoft의 [CreateIoCompletionPort](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-createiocompletionport), [GetQueuedCompletionStatus](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus), [PostQueuedCompletionStatus](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus), [CancelIoEx](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelioex) 문서.
 
 ## 공통 로거
 
@@ -102,7 +135,7 @@ LOG_ERROR("연결 실패: %d", error);
 
 `CoreGlobal`이 로거를 멤버로 소유하고 `GLogger`는 재할당할 수 없는 접근 포인터다. 기본 상태는 콘솔·Info다. 작업 스레드는 `main()` 종료 전에 모두 종료·합류해야 한다. `GLogger`를 직접 삭제하거나 다른 전역 객체의 생성자·소멸자에서 로그를 호출하지 않는다. 독립 출력이 필요하면 지역 `Logger`를 생성해 같은 `Init()`을 사용한다.
 
-상태 코드 항목은 `SC_대문자_스네이크` 형식으로 명명하고 종류별로 100개 단위 구간을 사용한다. 현재 로거는 100~199(정의된 항목 100~104), 네트워크는 200~299(정의된 항목 200~209)를 사용한다. 다른 종류의 구간은 해당 기능 구현 시 추가한다. 공통 상태 코드는 `Core/StatusCode.h`에서 정의한다. C++11 범위에 맞춰 반환값 경고 속성은 제거했으며 호출자는 성공·실패를 명시적으로 확인한다. 성공은 `SC_SUCCESS = 0`이며 `GetStatusMessage()`로 한국어 설명을 얻는다. 업무상 실패를 판단해야 하는 작업은 오류 코드를 반환하고, 로그를 남기는 호출에는 이 규칙을 적용하지 않는다. 단순 상태 판단·값 조회 및 Winsock 원본 오류 조회도 기존 반환형을 유지한다. 프로젝트의 `try-catch`와 직접 `throw`는 사용하지 않으며 자원은 RAII로 정리한다. 표준 라이브러리의 자원 부족 예외까지 반환값으로 바꾸지는 않는다.
+상태 코드 항목은 `SC_대문자_스네이크` 형식으로 명명한다. 종류별 번호 대역은 사용하지 않으며 `SC_SUCCESS = 0` 이후 값은 선언 순서대로 자동 부여한다. 상태 판단에는 숫자 리터럴 대신 열거 항목을 사용한다. 공통 상태 코드는 `Core/StatusCode.h`에서 정의한다. C++11 범위에 맞춰 반환값 경고 속성은 제거했으며 호출자는 성공·실패를 명시적으로 확인한다. 성공은 `SC_SUCCESS = 0`이며 `GetStatusMessage()`로 한국어 설명을 얻는다. 업무상 실패를 판단해야 하는 작업은 오류 코드를 반환하고, 로그를 남기는 호출에는 이 규칙을 적용하지 않는다. 단순 상태 판단·값 조회 및 Winsock 원본 오류 조회도 기존 반환형을 유지한다. 프로젝트의 `try-catch`와 직접 `throw`는 사용하지 않으며 자원은 RAII로 정리한다. 표준 라이브러리의 자원 부족 예외까지 반환값으로 바꾸지는 않는다.
 
 CTest는 레벨 필터·한글·추가 기록·동시 기록·출력 대상·초기화 실패 및 매크로 동작을 확인한다. `jh_backend_logger_tests --console`은 실제 콘솔의 한글 출력과 코드 페이지 유지 여부를 확인하며, 일반 검사는 빌드 폴더의 `logger-tests-*`에 산출물을 남긴다.
 
