@@ -15,10 +15,8 @@ public:
 	static StatusCode CreateTcpSocket(OUT SOCKET& socket);
 	static StatusCode SetTcpNoDelay(SOCKET socket, bool isEnabled);
 
-	// bind 전에 설정한다. 주소 독점 옵션과 동시에 활성화하지 않는다.
-	static StatusCode SetReuseAddress(SOCKET socket, bool isEnabled);
-
 	// bind 전에 설정한다.
+	static StatusCode SetReuseAddress(SOCKET socket, bool isEnabled);
 	static StatusCode SetExclusiveAddressUse(SOCKET socket, bool isEnabled);
 	static StatusCode SetSendBufferSize(SOCKET socket, int32 size);
 	static StatusCode SetReceiveBufferSize(SOCKET socket, int32 size);

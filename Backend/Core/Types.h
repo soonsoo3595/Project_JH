@@ -4,6 +4,7 @@
 #include <climits>
 #include <condition_variable>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 
 // 출력·갱신 매개변수 표시용이다. Windows SDK에 정의되어 있으면 그대로 사용한다.
@@ -12,6 +13,7 @@
 #endif
 
 // 비트 수가 명확해야 하는 정수에 사용한다.
+using BYTE		= unsigned char;
 using int8		= std::int8_t;
 using int16		= std::int16_t;
 using int32		= std::int32_t;
@@ -38,3 +40,5 @@ using LockGuard		= std::lock_guard<Mutex>;
 
 // bool·char·std::size_t와 문자열·포인터는 원래 타입을 사용한다.
 // 별칭은 새 타입이 아니며 네트워크 전송 시 바이트 순서·직렬화는 별도로 처리한다.
+
+using IocpObjectRef = std::shared_ptr<class IocpObject>;

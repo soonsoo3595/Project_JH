@@ -17,6 +17,10 @@ target_compile_options(jh_backend_options INTERFACE /W4 /permissive- /utf-8)
 add_library(jh_backend_core STATIC
     Core/Types.h
     Core/Container.h
+    Core/IocpCore.cpp
+    Core/IocpCore.h
+    Core/IocpEvent.cpp
+    Core/IocpEvent.h
     Core/NetAddress.cpp
     Core/NetAddress.h
     Core/SocketUtils.cpp
@@ -46,6 +50,12 @@ endforeach()
 include(CTest)
 if(BUILD_TESTING)
     # 로컬 테스트 소스는 Git에 포함하지 않는다.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/IocpCoreTests.cpp")
+        add_executable(jh_backend_iocp_tests Tests/IocpCoreTests.cpp)
+        target_link_libraries(jh_backend_iocp_tests PRIVATE jh_backend_core)
+        add_test(NAME backend_iocp_core COMMAND jh_backend_iocp_tests)
+        set_tests_properties(backend_iocp_core PROPERTIES TIMEOUT 15)
+    endif()
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/NetworkTests.cpp")
         add_executable(jh_backend_network_tests Tests/NetworkTests.cpp)
         target_link_libraries(jh_backend_network_tests PRIVATE jh_backend_core)

@@ -20,7 +20,7 @@ StatusCode SocketUtils::CreateTcpSocket(OUT SOCKET& socket)
 		return StatusCode::SC_NET_SOCKET_ALREADY_OPEN;
 	}
 	// IOCP에 사용할 수 있는 소켓을 만들고 자식 프로세스에 핸들이 상속되지 않도록 한다.
-	const SOCKET createdSocket = WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
+	const SOCKET createdSocket = ::WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
 		WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
 	if (createdSocket == INVALID_SOCKET)
 	{

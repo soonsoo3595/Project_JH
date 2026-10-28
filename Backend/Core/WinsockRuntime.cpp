@@ -4,7 +4,7 @@ WinsockRuntime::WinsockRuntime()
 	: _startupError(0)
 {
 	WSADATA winsockData{};
-	_startupError = WSAStartup(MAKEWORD(2, 2), &winsockData);
+	_startupError = WSAStartup(MAKEWORD(2, 2), OUT &winsockData);
 }
 
 WinsockRuntime::~WinsockRuntime()
