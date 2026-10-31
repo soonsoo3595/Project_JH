@@ -12,13 +12,13 @@ int main()
 	}
 
 	const WinsockRuntime winsockRuntime;
-	const int startupError = winsockRuntime.GetStartupError();
-	if (startupError != 0)
+	const StatusCode winsockInitResult = winsockRuntime.GetSocketInitResult();
+	if (winsockInitResult != StatusCode::SC_SUCCESS)
 	{
-		LOG_ERROR("서버 Winsock 초기화 실패: %d", startupError);
+		LOG_ERROR("서버 Winsock 초기화 실패: %s (오류: %d)", GetStatusMessage(winsockInitResult), winsockRuntime.GetWinsockError());
 		return 1;
 	}
 
-	LOG_INFO("서버 템플릿: Winsock 초기화 완료. IOCP 연결 처리는 아직 구현하지 않았습니다.");
+	LOG_INFO("서버 템플릿: Winsock·확장 함수 초기화 완료. IOCP 연결 처리는 아직 구현하지 않았습니다.");
 	return 0;
 }

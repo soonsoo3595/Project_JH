@@ -24,6 +24,8 @@ const char* GetStatusMessage(StatusCode code) noexcept
 	case StatusCode::SC_NET_SOCKET_CLOSE_FAILED: return "소켓 종료 실패";
 	case StatusCode::SC_NET_LOCAL_ADDRESS_FAILED: return "소켓 로컬 주소 조회 실패";
 	case StatusCode::SC_NET_INVALID_ARGUMENT: return "잘못된 네트워크 함수 인수";
+	case StatusCode::SC_NET_EXTENSION_FUNCTION_BIND_FAILED: return "Winsock 확장 함수 조회 실패";
+	case StatusCode::SC_NET_WINSOCK_STARTUP_FAILED: return "Winsock 시작 실패";
 
 	// IOCP
 	case StatusCode::SC_IOCP_NOT_INITIALIZED: return "IOCP가 초기화되지 않음";

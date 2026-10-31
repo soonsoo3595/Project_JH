@@ -1,6 +1,8 @@
 ﻿#pragma once
 
-// 인스턴스 수명 동안 Winsock을 유지한다. 이후 생성할 소켓보다 먼저 생성하고 나중에 파괴한다.
+#include "Core/StatusCode.h"
+
+// 소켓을 사용하기 전에 Winsock을 초기화하고 확장 함수를 조회한다. 객체 소멸 시 자동으로 정리한다.
 class WinsockRuntime final
 {
 public:
@@ -12,10 +14,12 @@ public:
 	WinsockRuntime(WinsockRuntime&&) = delete;
 	WinsockRuntime& operator=(WinsockRuntime&&) = delete;
 
-	// WSAStartup 반환값이다. 0은 성공이며 WSAGetLastError로 대체하지 않는다.
-	int GetStartupError() const;
+	// WSA 시작과 확장 함수 조회를 합친 전체 초기화 결과다.
+	StatusCode GetSocketInitResult() const noexcept		{ return _socketInitResult; }
+	int GetWinsockError() const noexcept				{ return _winsockError; }
 
 private:
-	int _startupError;
+	StatusCode _socketInitResult = StatusCode::SC_SUCCESS;
+	int _startupResult = 0;
+	int _winsockError = 0;
 };
-

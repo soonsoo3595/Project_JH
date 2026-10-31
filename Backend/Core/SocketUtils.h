@@ -4,16 +4,22 @@
 #include "Core/NetAddress.h"
 
 #include <winsock2.h>
+#include <mswsock.h>
 
-// WinsockRuntime 초기화에 성공한 뒤 사용한다.
 class SocketUtils final
 {
 public:
-	SocketUtils() = delete;
+	static LPFN_CONNECTEX		ConnectEx;
+	static LPFN_DISCONNECTEX	DisconnectEx;
+	static LPFN_ACCEPTEX		AcceptEx;
 
-	// 출력 변수는 INVALID_SOCKET으로 전달한다. 생성한 소켓은 호출자가 소유한다.
+public:
+	SocketUtils() = delete;
+	static StatusCode BindWindowsFunction(SOCKET socket, GUID guid, OUT LPVOID* fn);
+
 	static StatusCode CreateTcpSocket(OUT SOCKET& socket);
 	static StatusCode SetTcpNoDelay(SOCKET socket, bool isEnabled);
+	static StatusCode SetUpdateAcceptSocket(SOCKET socket, SOCKET listenSocket);
 
 	// bind 전에 설정한다.
 	static StatusCode SetReuseAddress(SOCKET socket, bool isEnabled);
@@ -25,7 +31,10 @@ public:
 	static StatusCode Listen(SOCKET socket, int32 backlog = SOMAXCONN);
 
 	static StatusCode GetLocalAddress(SOCKET socket, OUT NetAddress& address);
-
-	// 성공 시 INVALID_SOCKET으로 되돌린다. 이미 무효라면 아무 작업도 하지 않는다.
 	static StatusCode CloseSocket(OUT SOCKET& socket);
+
+private:
+	// Init은 WinsockRuntime에서만 호출한다
+	friend class WinsockRuntime;
+	static StatusCode Init();
 };
