@@ -168,3 +168,7 @@ IOCP·세션 수명·종료 절차를 설계하고, 이후 프레이밍·메시�
 - [MSVC 소스 문자 집합과 BOM 감지](https://learn.microsoft.com/en-us/cpp/build/reference/source-charset-set-source-character-set)
 - [CMake VS 2026 생성기](https://cmake.org/cmake/help/latest/generator/Visual%20Studio%2018%202026.html)
 - [Git working-tree-encoding](https://git-scm.com/docs/gitattributes)
+
+`WinsockRuntime` 생성자는 WSAStartup 성공 후 private SocketUtils::Init을 실행한다. 호출자는 GetSocketInitResult()로 전체 StatusCode를 한 번 확인하고 실패 시 GetWinsockError()로 원본 오류를 조회한다. WSA 시작 실패는 SC_NET_WINSOCK_STARTUP_FAILED, 확장 함수 조회 실패는 SC_NET_EXTENSION_FUNCTION_BIND_FAILED다. 확장 함수 초기화가 실패해도 WSA 시작이 성공했다면 소멸 시 WSACleanup을 호출한다. SocketUtils 생성은 금지하며 별도 자동 초기화 생성자는 제거했다. 서버·테스트 클라이언트 진입점도 통합 결과를 확인한다. 초기화는 소켓·워커 시작 전에 직렬로 수행한다. Listener의 즉시 실패 재귀 재시도는 보류 상태다.
+
+`SocketUtils::SetUpdateAcceptSocket(socket, listenSocket)`은 AcceptEx 성공 완료 후 SO_UPDATE_ACCEPT_CONTEXT를 반영하고 StatusCode를 반환한다. Listener는 세션 등록 전에 호출하며 실패 시 로그를 남기고 수락 세션 참조를 해제한 뒤 기존 재요청 경로로 진행한다. LINGER 설정은 추가하지 않았다. 로컬 검사에서 별도 버퍼·OVERLAPPED를 사용하는 실제 루프백 AcceptEx 완료 후 컨텍스트 갱신과 getpeername 상대 주소 조회를 확인했으며, 이는 작성 중인 제품 Listener 전체 흐름의 검증과 구분한다.
