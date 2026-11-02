@@ -1,9 +1,27 @@
 # Project JH 현재 상태
 
-최종 갱신: 2026-10-29 (Asia/Seoul)
+최종 갱신: 2026-11-02 (Asia/Seoul)
 상태 관리: 현재 PM 채팅
 
 ## 현재 단계
+
+2026-11-01 사용자 승인 후 TestClient의 LOG_ERROR 오타·SocketUtils 주석·README getter 설명을 수정해 이전 컴파일 실패·커밋 보류를 해소했다. 백엔드 보고 기준 Debug·Release Core·서버·클라이언트·로컬 검사 대상 빌드 및 선택 CTest 각 3/3 통과. 승인된 Winsock/SocketUtils 변경은 9f6222f, README 두 단락은 278d3da로 선택 커밋했다. Service/Listener/Session과 관련 공통 문서 등은 미커밋으로 유지한다. 스테이징은 비어 있고 push·PR·병합은 없으며 전체 CTest·제품 Listener 전체 검증을 의미하지 않는다. PM은 커밋 이력·잔여 상태·현재 호출부를 대조했고 빌드·실행은 재수행하지 않았다. 아래 오타 실패·보류 기록은 수정 전 이력이다.
+
+2026-11-01 최신 WinsockRuntime/SocketUtils 확인에서는 테스트 클라이언트 Main.cpp:18의 GetWinSockErrorLOG_ERROR 오타로 Debug C3861 컴파일 오류가 발생해 사용자 요청의 커밋을 보류했다. 사용자 코드 사전 승인 원칙에 따라 자동 수정하지 않았고 Git 채팅에 커밋 실행을 요청하지 않았다. Core·서버·로컬 검사 빌드와 선택 검사 통과는 테스트 클라이언트 포함 전체 빌드 성공을 의미하지 않는다.
+
+2026-11-01 사용자 승인으로 WinsockRuntime에 WSAStartup→SocketUtils::Init을 통합하고 두 제품 진입점이 전체 초기화 결과를 검사하도록 변경했다. 이전 제품 확장 함수 초기화 호출부 부재는 해소됐으며 실제 제품 Listener 전체 연결·종료 검증은 별도로 남아 있다.
+
+2026-11-01 사용자 요청으로 SocketUtils::SetUpdateAcceptSocket과 Listener::ProcessAccept의 세션 등록 전 컨텍스트 갱신을 추가했다. 실패하면 로그·수락 세션 참조 정리 후 기존 재요청 경로로 진행한다. 백엔드 보고 기준 지정 대상 빌드와 선택 CTest 각 3/3 통과지만 제품 Listener의 주소 버퍼·종료·완료 회수·재귀 재시도 문제는 아직 미수정·미검증이다.
+
+2026-10-31 후속 요청으로 SocketUtils::Init을 StatusCode 반환으로 변경하고 소켓 생성·확장 함수 조회·정리 실패 전달을 구현했다. 세 확장 함수 포인터는 전체 성공 시 반영하며 생성자는 실패를 로그로 남긴다. 제품 main의 초기화 호출 연결은 아직 없고 실제 AcceptEx 동작도 미검증이다. 기존 초기화의 assert 내부 실행 지적은 이 변경으로 대체하되 제품 호출부 부재는 남아 있다.
+
+2026-10-31 후속 요청으로 Listener 리뷰의 실패 완료 처리·Close 결과 전달 두 항목만 수정했다. 실패·취소·종료 중 완료는 세션을 정리하고 정상 등록을 건너뛰며 Close는 소켓 닫기 결과를 반환한다. 백엔드 보고 기준 지정 대상 빌드·CTest 각 3/3 통과이며 직접 호출 검사다. 실제 AcceptEx·닫기 실패 강제 주입·종료 경쟁·오래된 ServiceTests를 포함한 전체 빌드/검사는 이번에 검증하지 않았다. 나머지 리뷰 사항은 미해결이다.
+
+2026-10-31 사용자 작성 후의 Service/Listener는 빈 틀 단계에서 변경됐으나 최신 엄격 리뷰는 정적 확인만 수행했다. 새 코드의 빌드·실행 검증은 없으며 아래 보고된 미해결 사항이 남아 있다. 이전 대상 검사 3/3을 현재 Listener 구현의 검증 결과로 해석하지 않는다.
+
+2026-10-31 사용자 승인으로 Service의 세션 정원 검사·집합 삽입을 같은 뮤텍스 안에서 처리했다. 내부 전제는 assert, 예상 가능한 실행 중 실패는 StatusCode로 구분하는 규칙도 확정했다. 백엔드 보고 기준 Debug·Release 전체 빌드 성공·대상 CTest 각 3/3 통과이며 정원 검사와 시작 검사 두 건만 포함한다. 기존 backend_service는 낡은 무효 소켓 기대 때문에 이번 검증에서 제외했으므로 전체 CTest 통과 결과가 아니다.
+
+2026-10-30 사용자 요청으로 백엔드가 Service/Session 리뷰와 TODO 두 곳을 처리했으며 서비스 내부 구현은 계속 진행 중이다. 이후 Session 소켓 생성이 반영된 최신 백엔드 리뷰 보고에서는 Debug 전체 빌드 성공·CTest 2/3 통과다. backend_service는 소켓 미생성 시점의 SC_NET_INVALID_SOCKET 기대가 남은 로컬 테스트 때문에 실패했다. 제품 결함과 구분하며 테스트는 사전 승인 없이 수정하지 않았다. 이전 Debug·Release 각 3/3은 변경 전 결과이고 현재 통과 결과로 취급하지 않는다. 로거·네트워크·IOCP의 이전 로컬 검사는 이번에 재실행하지 않았다.
 
 2026-10-29 사용자 요청으로 StatusCode 번호 대역 제거를 완료했다. SC_SUCCESS=0 이외의 명시 번호와 README의 고정 번호 설명을 제거하고 선언 순서 자동 증가로 정리했다. SC_ 이름·종류별 주석·GetStatusMessage는 유지한다. 과거 검증 기록의 번호는 당시 이력이다.
 
@@ -25,7 +43,32 @@
 
 ## 확정한 사항
 
-- 현재 IOCP API는 IocpObject/IocpEvent와 IocpCore::Register/Dispatch 구조다. 생성자에서 private Init을 호출하고 IsInitialized로 확인하며 소멸자에서 private Close를 호출한다. 이전 Wait/Post/IocpCompletion API는 현재 계약에서 제외한다. IocpObject는 GetHandle과 Dispatch(IocpEvent*, DWORD numOfBytes, DWORD error)를 구현하고 정상·실패·취소 완료를 모두 받는다. GQCS FALSE라도 이벤트가 있으면 실패 완료를 전달하며 패킷 없는 실패·타임아웃과 구분한다. 콜백 직전에 이벤트 owner를 비우고 지역 shared_ptr로 콜백 수명을 유지해 완료 후 순환 참조를 끊는다. 재요청에는 SetOwner가 필요하고 즉시 실패해 완료가 오지 않으면 호출자가 해제한다. 이벤트 복사·이동은 금지하며 완료 처리·워커 합류 후 포트를 소멸시킨다. 널 객체·무효 핸들을 검사하고 SC_IOCP_INVALID_OBJECT를 추가했다. IOCP 결과는 SC_IOCP_ 항목으로 구분한다. Listener·Session·제품 워커·접속/송수신 흐름은 아직 미구현이다.
+- 2026-11-02 사용자 지정으로 Listener::ProcessAccept에서 AddSession 반환값을 확인한다. 실패하면 상태 설명·코드를 Warning 로그로 남기고 지역 세션 참조를 해제한 뒤 기존 RegisterAccept를 호출하고 반환한다. 백엔드 보고 기준 Debug Core 빌드·공백 검사 통과. 새 테스트·실제 Accept 실패 주입·Release·커밋은 미수행이다. 기존 주소 버퍼·재귀 재시도·종료 동기화·이벤트 해제 보류 사항은 이번에 변경하지 않았다. PM은 실패 분기만 대조했고 코드 수정·빌드·실행·QA는 하지 않았다.
+
+- 2026-11-02 사용자 지정으로 ServerService::Start의 리스너 시작 실패 분기는 기존 사용자 구현 Stop을 호출하고 _listener를 reset한 뒤 원래 listenerResult를 반환한다. 종료 실패 로그는 Stop 내부에 모으고 정리 결과로 시작 오류를 덮어쓰지 않는다. 백엔드 보고 기준 Debug Core 빌드·대상 공백 검사 통과. 실행·Release·새 테스트·커밋은 미수행이며 기존 Listener/Session 미사용 매개변수 경고와 Accept·종료 완료 회수 과제는 유지한다. PM은 해당 분기만 대조하고 코드 수정·빌드·실행·QA는 하지 않았다.
+
+- WinsockRuntime은 GetInitResult(StatusCode)·GetNativeError를 제공하며 GetStartupError는 WSAStartup만의 결과를 반환하는 호환 API로 유지한다. SocketUtils는 생성할 수 없고 Init은 private·friend WinsockRuntime으로 제한한다. WSAStartup 성공 여부에 따라 소멸 정리하므로 확장 함수 초기화 실패에도 WSACleanup을 수행한다. SC_NET_WINSOCK_STARTUP_FAILED를 추가했고 서버·테스트 클라이언트는 전체 결과를 검사한다.
+
+- SetUpdateAcceptSocket(socket, listenSocket)은 SO_UPDATE_ACCEPT_CONTEXT를 설정하고 StatusCode를 반환한다. 기존 SC_NET_SOCKET_OPTION_FAILED·SC_NET_INVALID_SOCKET을 사용한다. Listener는 세션 집합 등록 전에 호출하며 실패 시 기존 재요청 경로를 사용한다. LINGER는 기본값을 유지한다.
+
+- SocketUtils::Init은 임시 소켓 생성·세 확장 함수 조회·소켓 정리 결과를 StatusCode로 반환한다. BindWindowsFunction의 WSAIoctl 실패는 SC_NET_EXTENSION_FUNCTION_BIND_FAILED로 구분하고 정리 후에도 원본 Winsock 오류를 보존한다. 포인터는 전체 초기화 성공 시 반영한다. 사용자 RegisterAccept의 SetOwner 위치 변경은 백엔드가 확인만 했으며 이번에 수정하지 않았다. 재귀 재시도 수정은 사용자 보류이고 Accept 주소 출력 버퍼는 향후 recv/send 버퍼와 별개로 실제 실행 전에 준비해야 한다.
+
+- Listener::Dispatch는 종료 중 완료와 실패·취소 완료에서 세션 정리 후 정상 등록을 생략한다. 종료 중이 아닌 비취소 실패는 기존 RegisterAccept로 재요청한다. Close는 CloseSocket 결과를 반환하며 Listener·ServerService 소멸 경로는 닫기 실패를 로그로 남긴다. 요청별 owner 재설정·RegisterAccept 종료 검사·재귀 재시도는 이번 지정 범위 밖으로 미수정이며 이벤트 해제는 사용자 보류다. AcceptEx의 OVERLAPPED 인자는 수정됐으나 출력 버퍼에 이벤트를 전달하는 오류는 남아 있다.
+
+- 2026-10-31 사용자 요청으로 `Core/Listener.h·cpp`에 빈 생성자·소멸자만 추가하고 CMake Core 목록에 등록했다. 이는 최초 빈 틀 등록 시점의 이력이다. 이후 사용자 구현이 추가됐으며 현재 상태와 미해결 사항은 최신 Service/Listener 리뷰 보고를 따른다. 백엔드 보고 기준 정상 CMake 재구성·Debug Core 빌드 통과, 새 파일 BOM·CRLF 적용. Release·실행·새 테스트·커밋은 미수행이다. PM은 파일 내용과 CMake 등록만 대조하고 빌드·실행은 하지 않았다.
+
+- 2026-10-31 후속 사용자 요청으로 세션 수·정원 조회 API를 제거하고 실제 AddSession/RemoveSession 변경 시 현재 수/정원을 Info 로그로 남긴다. 개수는 집합 변경 잠금 안에서 저장하고 로그는 잠금 밖에서 출력한다. 중복 추가·미등록 삭제는 로그가 없고 개수 저장의 _DEBUG 조건도 제거하여 Release에서도 로거 설정에 따라 기록한다. 다중 스레드의 로그 순서는 실제 집합 변경 순서와 다를 수 있다. 테스트의 개수 확인은 테스트 전용 파생 클래스가 잠금 안에서 수행한다.
+
+- Service::AddSession은 StatusCode를 반환하며 동일 뮤텍스 안에서 중복 여부·정원을 확인하고 삽입한다. 중복 추가는 성공이며 개수는 유지한다. RemoveSession도 같은 잠금을 사용한다. 최신 요청으로 GetCurrentSessionCount·GetMaxSessionCount 공개 조회 API는 제거했다. CreateSession은 정원을 예약하지 않고 등록 실패 시 세션 소유권은 호출자에게 남는다. 최대 세션 수는 개발자가 보장하는 양수 조건으로 생성자 assert(maxSessionCount > 0)에서만 검사한다. Start/AddSession의 양수 런타임 검사와 SC_SERVICE_INVALID_MAX_SESSION_COUNT는 제거했다. 정원 초과 SC_SERVICE_SESSION_LIMIT_REACHED와 널 세션 오류는 유지한다. 별도 Lock 클래스 없이 기존 Mutex·LockGuard를 사용한다.
+
+- 2026-10-30 사용자 지침으로 사용자 직접 수정 코드의 추가 변경은 이유 설명·사전 질문·승인을 거치도록 team.md와 coding-standards.md에 반영했다. 이번 지정 변경은 IocpCore 생성자·소멸자가 Init/Close 반환값을 확인하고 실패 시 상태 설명·Windows 원본 오류를 LOG_ERROR로 기록하는 것뿐이다. 기존 생성자 초기화·소멸자 해제 구조는 유지한다. 백엔드 보고 기준 Debug Core 빌드·대상 diff 검사 통과, Session::Dispatch의 C4100 경고는 유지한다. 실패 강제 주입·실행·새 테스트·Release·커밋은 미수행이다. PM은 IocpCore 반영 상태를 확인했고 코드 수정·빌드·실행은 하지 않았다.
+
+- 현재 Service는 IOCP 코어·세션 팩토리·세션 집합을 보관하며 ServerService/ClientService의 Start는 기반 Start의 IOCP·팩토리 검사를 먼저 호출하고 실패를 반환한다. `CreateSession(OUT SessionRef& session)`은 StatusCode를 반환하고 IOCP·팩토리·널 결과를 검사하며 실패 시 기존 출력을 보존한다. 등록 실패는 원래 상태 코드를 반환한다. 최신 사용자 요청으로 CreateSession 내부 로그·Logger include·GetLastError 조회는 제거하고 호출자가 상태를 확인해 로그 한 줄을 남기도록 책임을 정했다. SC_SERVICE_INVALID_SESSION_FACTORY·SC_SERVICE_SESSION_CREATE_FAILED를 자동 번호로 추가했다. 서비스는 shared_ptr로 소유해야 하고 세션은 서비스의 weak_ptr를 보관한다. 생성 성공과 세션 집합 추가는 별도다.
+- 현재 Session 생성자는 CreateTcpSocket, 소멸자는 CloseSocket을 호출한다. 사용자 요청으로 반환 StatusCode를 확인해 실패 시에만 설명과 WSAGetLastError를 LOG_ERROR로 기록했다. 앞선 소켓 미생성 검토 사항은 이후 사용자 변경으로 현재 상태와 달라졌다. 집합 동기화·최대 수 제한과 내부 전제 처리는 위 2026-10-31 항목을 따른다. 연결·송수신·리스너·워커·Session 완료 처리는 미완료다. 현재 소켓 생성 코드가 있어도 제품 접속 흐름 완료를 의미하지 않는다.
+
+- 2026-10-29 사용자 요청으로 `Core/Service.h·cpp`에 기본 생성자·가상 소멸자만 둔 Service 틀을 추가하고 CMake Core 목록에 등록했다. 이는 최초 빈 틀 추가 시점의 이력이며 현재 Service/Session 구현 상태는 위 2026-10-30 항목을 따른다. 백엔드 보고 기준 CMake 자동 재구성·Debug 빌드 성공, diff 공백 검사·새 파일 BOM/CRLF 확인. 실행·새 테스트·Release 빌드·커밋은 미수행이다. PM은 파일 내용·CMake 등록만 대조하고 빌드·실행은 재수행하지 않았다.
+
+- 현재 IOCP API는 IocpObject/IocpEvent와 IocpCore::Register/Dispatch 구조다. 생성자에서 private Init을 호출하고 IsInitialized로 확인하며 소멸자에서 private Close를 호출한다. 이전 Wait/Post/IocpCompletion API는 현재 계약에서 제외한다. IocpObject는 GetHandle과 Dispatch(IocpEvent*, DWORD numOfBytes, DWORD error)를 구현하고 정상·실패·취소 완료를 모두 받는다. GQCS FALSE라도 이벤트가 있으면 실패 완료를 전달하며 패킷 없는 실패·타임아웃과 구분한다. 콜백 직전에 이벤트 owner를 비우고 지역 shared_ptr로 콜백 수명을 유지해 완료 후 순환 참조를 끊는다. 재요청에는 SetOwner가 필요하고 즉시 실패해 완료가 오지 않으면 호출자가 해제한다. 이벤트 복사·이동은 금지하며 완료 처리·워커 합류 후 포트를 소멸시킨다. 널 객체·무효 핸들을 검사하고 SC_IOCP_INVALID_OBJECT를 추가했다. IOCP 결과는 SC_IOCP_ 항목으로 구분한다. Service/Session 기반은 위 2026-10-30 항목을 따르며 Listener·제품 워커·접속/송수신 흐름은 미구현이다.
 
 - 2026-10-26 사용자 요청으로 출력·갱신 참조에 out 접두사 대신 OUT을 적용했다. Types.h에 미정의 시 빈 매크로를 제공하며 SocketUtils의 소켓 생성·주소 조회·종료와 Logger 내부 출력 참조에 적용했다. 읽기 전용 입력 참조에는 사용하지 않으며 입출력 인자의 기존 값 조건은 주석을 따른다.
 - SocketUtils에 `SetReuseAddress(SOCKET, bool)`를 추가했다. SO_REUSEADDR을 Bind 전에 명시적으로 설정하며 자동 활성화하지 않는다. 주소 독점 옵션은 유지하고 두 옵션을 동시에 활성화하지 않는다. Windows의 중복 바인딩 의미는 README를 따르며 OS 설정 실패는 기존 SC_NET_SOCKET_OPTION_FAILED로 반환한다.
@@ -40,7 +83,7 @@
 
 - 사용자 요청으로 `Backend/Core/Types.h`에 `int8/16/32/64`·`uint8/16/32/64`·`float32/64`를 정의했다. CMake Core 소스 목록과 PCH에 연결했고 `StatusCode.h`가 직접 include하여 기반 타입을 int32로 사용한다. 당시 타입 변경에서는 오류 항목·번호를 유지했다. bool·char·std::size_t·문자열·포인터·Windows API 원본 타입은 유지하며 도메인 ID를 미리 추가하지 않았다.
 
-- 사용자 요청으로 테스트 소스를 로컬 전용으로 관리한다. `/Backend/Tests/`를 Git에서 제외하고 기존 로컬 파일은 보존했다. `Backend/TestClient/`는 계속 버전 관리 대상이다. 로거 테스트는 `Tests/LoggerTests.cpp`·`LoggerCaller.cpp`가 모두 있을 때, 네트워크 검사는 `Tests/NetworkTests.cpp`가 있을 때 CMake에 등록한다. IOCP 검사 소스도 조건부로 등록하며 현재 로컬 테스트 소스가 모두 있으면 CTest 5개, 없으면 서버·클라이언트 시작 검사 2개가 등록된다.
+- 사용자 요청으로 테스트 소스를 로컬 전용으로 관리한다. `/Backend/Tests/`를 Git에서 제외하고 기존 로컬 파일은 보존했다. `Backend/TestClient/`는 계속 버전 관리 대상이다. 로거 테스트는 `Tests/LoggerTests.cpp`·`LoggerCaller.cpp`가 모두 있을 때, 네트워크 검사는 `Tests/NetworkTests.cpp`가 있을 때 CMake에 등록한다. IOCP·Service 검사도 소스 존재 시 조건부 등록한다. 현재 ServiceTests.cpp만 있어 CTest는 3개이며 로컬 테스트가 전혀 없으면 시작 검사 2개만 등록된다.
 
 - 2026-10-24 사용자 요청으로 `Backend/Core/Logger.h·cpp`의 공통 로거를 구현했다. 두 진입점은 직접 출력과 코드 페이지 설정 대신 로거를 사용한다. 현재 동작과 사용법은 [Backend/README.md](../../Backend/README.md)의 공통 로거 항목을 따른다.
 - 같은 날 사용자 확정에 따라 전역 로거·`Init`·`LOG_*` 매크로 구조로 변경했다. `CoreGlobal.h·cpp`의 객체가 자동 소유하며 재할당 불가 `GLogger` 포인터로 접근한다. 두 진입점은 `GLogger->Init(LogOutput::Console/File/Both, 최소 레벨, 선택 파일 경로)`로 설정한다. 재초기화 성공 시 설정을 직렬화해 교체하고 실패하면 기존 설정을 유지한다. 기존 `LoggerOptions`·`Log()`와 지역 인스턴스 사용도 유지한다.
@@ -55,7 +98,7 @@
 - PC와 Android 사용자가 함께 플레이하는 크로스플레이를 지원한다. PC 버전을 먼저 완성한 뒤 Android를 지원한다.
 - PC 클라이언트는 Windows만 지원한다. 개발 환경은 사용자 전달 기준 Visual Studio 2026·UE 5.8이다. 실제 설치 및 빌드 호환성은 미검증이다.
 - CI는 GitHub Actions로 확정했다. 초기 범위는 GitHub 제공 Windows 실행 환경에서 백엔드 빌드·테스트 자동화다. 실제 워크플로 생성·실행은 수행하지 않았다.
-- 독립 백엔드는 CMake + vcpkg manifest 모드(`vcpkg.json`)로 구성했다. 외부 의존성 목록은 현재 비어 있다. 백엔드 세션 보고 기준 VS 2026 x64 Debug·Release 빌드와 각 구성의 CTest 5개(시작 검사 2개·로거 검사 1개·네트워크 기본 검사 1개·IOCP 검사 1개)가 통과했다. UE는 Unreal 빌드 체계를 유지하며 이번에 검증하지 않았다.
+- 독립 백엔드는 CMake + vcpkg manifest 모드(`vcpkg.json`)로 구성했다. 외부 의존성 목록은 현재 비어 있다. 백엔드 세션 보고 기준 VS 2026 x64 Debug·Release 빌드와 이전 각 구성의 CTest 3개 통과 후 Session 변경이 있었고 최신 Debug는 2/3이다(시작 검사 2개 통과·Service 검사 1개 실패). 최신 상태의 Release 재검증은 미수행이다. 이전 로거·네트워크·IOCP 검사 결과는 검증 이력을 따른다. UE는 Unreal 빌드 체계를 유지하며 이번에 검증하지 않았다.
 - 자체 백엔드 통신은 TCP + Protobuf를 사용한다. 프레이밍·스키마는 미확정이다.
 - 게임 플레이 흐름 및 구현 단계·완료 기준은 언제든 변경 가능한 초안이다.
 - 사용자는 단독 개발자이자 최종 의사결정자다. 현재 채팅은 PM 역할이며 역할별 세션은 필요할 때 확장한다.
@@ -98,6 +141,32 @@
 - PCH 추가 후 정상 CMake 구성은 vcpkg 7zip v26.02 다운로드의 DNS 오류로 실패했다. 백엔드 세션은 외부 의존성이 비어 있는 상태에서 검증 중에만 `VCPKG_MANIFEST_INSTALL=OFF`로 빌드하고 이후 캐시를 ON으로 복원했다고 보고했다. 2026-10-23 PM이 샌드박스 밖 도구 캐시 접근으로 manifest 설치 ON 상태의 정상 구성을 완료했다. 제한된 실행 환경에서는 같은 다운로드 DNS 오류가 발생할 수 있다. 프리셋과 manifest 설치 설정은 유지했다.
 
 ## 검증 상태
+
+- 백엔드 세션의 2026-11-01 최신 검토 보고: Core·서버·로컬 검사 Debug·Release 빌드 및 선택 CTest 각 2/2(초기화/정리·별도 루프백 Accept 컨텍스트 검사와 서버 시작) 통과. TestClient/Main.cpp:18은 GetWinSockErrorLOG_ERROR 미정의로 Debug C3861 실패했다. SocketUtils의 AcceptEx 컨텍스트 상속·독점 옵션 기본값 주석 및 README 과거 API 명칭 수정도 승인 안내 대상으로 남겼다. 커밋은 보류이며 기존 전체 변경·보류 중인 Listener 문제가 검토를 통과한 것으로 해석하지 않는다. PM은 해당 호출부만 대조했고 코드 수정·빌드·실행·추가 리뷰·QA·커밋은 하지 않았다.
+
+- 백엔드 세션의 2026-11-01 초기화 통합 보고: Debug·Release 관련 4대상 빌드·선택 CTest 각 3/3 통과. 자동 함수 포인터 초기화·중첩 런타임 참조 수 균형·최종 소멸 후 WSANOTINITIALISED·별도 루프백 AcceptEx 검사를 확인했다. 런타임 확장 함수 실패 강제 주입·전체 CTest·제품 Listener 전체 종료·F5·커밋은 미수행이다. PM은 런타임 API·정리 분기·SocketUtils 접근 제한·두 진입점만 대조하고 코드 수정·빌드·실행·QA는 하지 않았다. 아래 private Init 전의 API·제품 호출부 부재 기록은 당시 상태다.
+
+- 백엔드 세션의 2026-11-01 Accept 컨텍스트 갱신 보고: Debug·Release 관련 4개 대상 빌드와 선택 CTest 각 3/3 통과. 제품 Listener 대신 별도의 올바른 버퍼/OVERLAPPED를 사용한 루프백 AcceptEx→컨텍스트 갱신→getpeername 주소 일치를 확인했다. 제한 환경의 connect 실패 후 승인된 환경에서 동일 검사를 통과했다고 보고했다. 제품 주소 버퍼·종료·완료 회수·재귀 재시도는 미수정·미검증이며 전체 CTest·F5·커밋은 미수행이다. PM은 API·호출 위치·README만 대조했고 코드 수정·빌드·실행·QA는 하지 않았다. 이전 리뷰의 컨텍스트 갱신 누락은 이 변경으로 대체한다.
+
+- 백엔드 세션의 2026-10-31 SocketUtils 초기화 후속 구현 보고: Debug·Release Core·로컬 검사·서버·클라이언트 대상 빌드 및 선택 CTest 각 3/3 통과. Winsock 초기화 전 실패·정상/반복 초기화·세 함수 포인터·잘못된 GUID 조회 실패를 로컬에서 확인했다. 실제 AcceptEx·Close 실패 강제 주입·전체 CTest는 미수행이다. PM은 API·상태 항목·초기화 구현만 대조했으며 코드 변경·빌드·실행·QA·커밋은 하지 않았다. 이전 assert 내부 초기화·owner 누락 지적은 후속 변경과 구분하며 전체 리스너 완료를 의미하지 않는다.
+
+- 백엔드 세션의 2026-10-31 Listener 부분 수정 보고: Debug·Release Core·로컬 검사·서버·테스트 클라이언트 대상 빌드와 대상 CTest 각 3/3 통과. 실패/취소/종료 중 성공 완료와 빈 Listener 반복 Close를 직접 호출해 확인했다. 실제 AcceptEx·Close 실패 주입·종료 경쟁은 검증하지 않았고 오래된 ServiceTests 포함 전체 빌드·전체 CTest 통과가 아니다. PM은 현재 Listener 코드·소멸 경로·README만 대조했으며 추가 리뷰·빌드·실행·QA·커밋은 하지 않았다. 아래 정적 리뷰의 실패 완료·Close 결과 지적은 이 부분 수정으로 변경됐으며 나머지 지적은 유지한다.
+
+- 백엔드 세션의 2026-10-31 최신 Service/Listener 엄격 리뷰 보고: 코드 수정·빌드·실행 없이 정적 확인과 MS AcceptEx/closesocket 문서 대조만 수행했다. 보고된 미해결 사항은 AcceptEx 인자에서 이벤트를 출력 버퍼로 전달하고 OVERLAPPED는 nullptr인 점, 확장 함수 초기화의 assert 내부 실행 및 제품 호출부 부재, Accept 재요청 owner 설정 누락, 지속 실패 시 즉시 재귀 재시도, 완료 error 무시, _isClosing 미사용과 닫기/요청 소켓 경쟁, 완료 회수 전 서비스/IOCP 수명 종료 가능성, new AcceptEvent 해제 부재, SO_UPDATE_ACCEPT_CONTEXT와 AddSession 결과 처리 누락, Close의 닫기 실패 은폐다. 사용자 보장인 메인 스레드·인스턴스당 Start 한 번 호출을 전제로 중복/동시 Start는 결함으로 보고하지 않았다. PM은 현재 파일이 빈 틀 단계를 벗어난 사실만 대조했고 재리뷰·수정·빌드·실행·QA는 하지 않았다. 구현 조치·동작 검증 완료 보고는 아직 없다.
+
+- 백엔드 세션의 2026-10-31 Info 로그 후속 변경 보고: Debug·Release 전체 빌드와 대상 CTest 각 3/3 통과, 각 구성 직접 실행에서 Info 추가 6건·삭제 5건 확인. 실제 변경만 기록·잠금 밖 출력은 유지한다. 오래된 backend_service는 제외되어 전체 CTest 통과는 아니다. PM은 Service.cpp와 현재 설명을 대조했고 빌드·실행은 재수행하지 않았다. F5·제품 접속/송수신·커밋은 미수행이다. 아래 Debug 전용·Release 0건 결과는 변경 전 이력이다.
+
+- 백엔드 세션의 2026-10-31 조회 API 제거·내부 Debug 로그 변경 보고: Debug·Release 전체 빌드와 대상 CTest 각 3/3(정원 동시성·서버 시작·테스트 클라이언트 시작) 통과. 별도 실행에서 Debug 추가 로그 6건·삭제 로그 5건, Release 0건을 확인했다. 오래된 backend_service는 제외하여 전체 CTest 통과는 아니다. 사용자 SessionFactory·ServiceType 변경은 보존했다. PM은 공개 API·로그 위치·README를 대조했고 추가 빌드·실행·리뷰·QA·커밋은 하지 않았다. F5·제품 접속/송수신은 미수행이다.
+
+- 백엔드 세션의 2026-10-31 세션 정원·assert 규칙 적용 보고: Debug·Release 전체 빌드와 대상 CTest backend_service_capacity·backend_server_startup·backend_test_client_startup 각 구성 3/3 통과, Release NDEBUG 정의 확인. 기존 backend_service는 이전 무효 소켓 기대가 남아 수정·실행 대상에서 제외했으며 전체 검사 통과로 해석하지 않는다. 강제 assert 실패 실행·F5·제품 접속/송수신·별도 리뷰·QA·커밋은 미수행이다. 정원 테스트는 로컬 Git 제외다. PM은 공개 API·잠금/조건 구현·README를 대조했으며 코드 수정·빌드·실행·별도 검토는 하지 않았다. 아래 2026-10-30 동기화·정원 미구현 기록은 당시 상태다.
+
+- 최신 백엔드 리뷰 보고: Debug 전체 빌드 성공, CTest 2/3 통과·backend_service 실패. ServiceTests.cpp:57의 기본 Session 무효 소켓 기대가 현재 생성자 소켓 생성과 불일치한다. PM은 해당 테스트 기대와 생성자 호출을 대조했고 제품 결함으로 확정하지 않았다. 사용자 사전 승인 없이 코드·테스트를 수정하지 않았다. PCH 없는 Session.h MSVC C++14 컴파일 프로브는 통과했으나 엄격한 C++11 검증은 아니다. 다중 워커의 세션 집합 동기화 부재·최대 수 제한/입력 검증 부재는 남은 리뷰 사항이고 연결·수신·리스너·Dispatch·종료 배출은 미완료다. 이번 PM은 추가 리뷰·빌드·실행을 수행하지 않았다.
+
+- 백엔드 세션의 2026-10-30 Session 실패 로그 추가 보고: Session.cpp만 변경해 Debug Core 빌드·대상 diff 공백 검사 통과. 빈 Dispatch의 C4100 경고는 유지한다. 실패 주입·실행·새 테스트·Release·커밋은 미수행이다. PM은 생성자·소멸자의 현재 호출과 로그만 대조하고 코드 수정·빌드·실행은 하지 않았다. 아래 Service 테스트의 무효 기본 소켓 관련 결과는 변경 전 상태다.
+
+- 백엔드 세션의 2026-10-30 CreateSession 로그 책임 변경 보고: 내부 로그 제거 후 Debug Core 빌드·대상 diff 공백 검사 통과. 상태 반환·실패 출력 보존과 IocpCore 생성/소멸 실패 로그는 유지했다. README·로컬 테스트 기대를 수정했으나 이번 변경의 테스트 실행·Release·커밋은 미수행이다. PM은 Service.cpp·README를 대조했으며 빌드·실행은 하지 않았다. 아래 내부 로그·파일 로그 검증은 변경 전 이력이다.
+
+- 백엔드 세션의 2026-10-30 Service/Session TODO 완료·리뷰 보고: manifest ON Debug·Release 전체 빌드·CTest 각 3/3 통과. 현재 Tests에는 ServiceTests.cpp만 있어 이전 로거·네트워크·IOCP 검사는 이번에 실행하지 않았다. 새 검사는 팩토리 누락·널 반환·무효 소켓·다른 포트 등록 실패·검사용 파생 세션의 유효 소켓 등록·출력 보존·약한 서비스 참조·파일 로그를 확인했다. PCH 없는 공개 헤더 컴파일·BOM/CRLF·공백 검사·Tests Git 제외도 확인했다고 보고했다. 빈 Session::Dispatch의 C4100 경고 3건은 남아 있다. PM은 Service 공개 API·구현·Session 참조·CMake·README를 대조했으며 추가 코드 리뷰·빌드·실행·QA·커밋은 하지 않았다.
 
 - 백엔드 세션의 2026-10-29 StatusCode 번호 대역 폐지 완료 보고: Debug 전체 빌드와 diff 공백 검사 통과. 이번 선언 변경의 테스트 실행·Release 재빌드는 미수행이다. PM은 헤더·README를 대조했으며 빌드·실행·커밋은 하지 않았다.
 

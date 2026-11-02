@@ -26,7 +26,7 @@ cmake --build --preset windows-release
 ctest --preset windows-release
 ```
 
-실행 파일은 `out/build/windows-vs2026/Debug/` 또는 `Release/`에 생성된다. CTest에는 서버·클라이언트 시작 검사 2개가 등록되며, 로컬 `Tests/` 소스가 있으면 로거·네트워크·IOCP 검사를 각각 추가해 현재 총 5개가 된다. 테스트 소스가 없는 체크아웃에서도 빌드할 수 있다. 새 로컬 검사 소스를 추가하면 CMake 구성을 다시 실행한다. 두 시작 검사는 실제 프로그램 실행·Winsock 초기화·정상 종료만 확인한다. 네트워크·IOCP 검사는 검사 프로세스 안의 루프백 소켓을 사용하며 제품의 접속·송수신 흐름 검증과 구분한다.
+실행 파일은 `out/build/windows-vs2026/Debug/` 또는 `Release/`에 생성된다. CTest에는 서버·클라이언트 시작 검사 2개가 등록되며, 로컬 `Tests/` 소스가 있으면 로거·네트워크·IOCP·서비스 검사를 각각 추가한다. 전체 개수는 로컬 테스트 소스의 유무에 따라 달라진다. 테스트 소스가 없는 체크아웃에서도 빌드할 수 있다. 새 로컬 검사 소스를 추가하면 CMake 구성을 다시 실행한다. 두 시작 검사는 실제 프로그램 실행·Winsock 초기화·정상 종료만 확인한다. 네트워크·IOCP 검사는 검사 프로세스 안의 루프백 소켓을 사용하며 제품의 접속·송수신 흐름 검증과 구분한다.
 
 ## 언어 사용 기준
 
@@ -101,6 +101,23 @@ I/O 요청 전 `IocpEvent::SetOwner()`로 소유 객체를 설정하고 완료 �
 
 구현 근거: Microsoft의 [CreateIoCompletionPort](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-createiocompletionport), [GetQueuedCompletionStatus](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus), [PostQueuedCompletionStatus](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus), [CancelIoEx](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelioex) 문서.
 
+## 작성 중인 서비스·세션
+
+`Service`는 IOCP 코어와 세션 팩토리·세션 집합을 보관한다. `ServerService`와 `ClientService`의 `Start()`는 부모의 IOCP 초기화·팩토리 설정 검사를 먼저 호출한다. 서비스는 `shared_ptr`로 소유하고 `Session`의 서비스 참조는 `weak_ptr`로 유지한다.
+
+`CreateSession(OUT SessionRef& session)`은 `StatusCode`를 반환한다. 성공했을 때만 출력 인자를 교체하며 실패하면 기존 출력 값을 유지한다. 성공한 세션은 IOCP에 등록되고 서비스의 약한 참조를 보관한다. 세션 집합에 추가하는 작업은 별도다.
+
+- `SC_SERVICE_INVALID_SESSION_FACTORY`: 세션 팩토리가 비어 있다.
+- `SC_SERVICE_SESSION_CREATE_FAILED`: 팩토리가 널 세션을 반환했다.
+- `SC_IOCP_NOT_INITIALIZED`: IOCP 코어가 없거나 초기화되지 않았다.
+- 등록 실패: `Register()`가 반환한 기존 상태를 그대로 전달한다. `CreateSession()` 내부에서는 로그를 출력하지 않고 호출자가 반환된 상태를 확인해 기록한다.
+
+최대 세션 수는 개발자가 지켜야 하는 생성 조건이며 생성자에서 `assert(maxSessionCount > 0)`로 확인한다. `NDEBUG`가 정의되면 해당 검사는 제거된다. 정상적으로 발생할 수 있는 정원 초과는 `AddSession()`이 `SC_SERVICE_SESSION_LIMIT_REACHED`로 반환한다. 검사와 삽입은 같은 뮤텍스 잠금 안에서 처리하며 중복 등록은 성공으로 처리하고 개수를 늘리지 않는다. 삭제도 같은 뮤텍스를 사용한다. 실제 추가·삭제 시 잠금 안에서 개수를 저장하고 잠금을 해제한 뒤 Info 로그로 기록한다. 중복 추가·미등록 세션 삭제는 기록하지 않는다. 두 개수 조회 API는 제공하지 않는다. 해당 로그는 Release에서도 활성화되며 로거의 출력 대상·최소 레벨 설정을 따른다. 여러 스레드의 로그 출력 순서가 변경 순서와 같지는 않을 수 있다. 정원은 등록된 세션 집합에 적용하며 `CreateSession()`은 자리를 예약하지 않는다. 등록 실패 시 세션 소유권은 호출자에게 남는다.
+
+현재 제품 `Session`은 생성자에서 소켓 생성, 소멸자에서 소켓 정리 결과를 받아 실패 로그를 남긴다. 완료 처리와 접속·송수신은 아직 미구현이다.
+
+로컬 `Tests/ServiceTests.cpp`가 있으면 `backend_service`를 조건부 등록한다. PCH 없이 공개 헤더를 컴파일하고 팩토리 누락·널 반환·무효 소켓·다른 IOCP 등록 실패·정상 등록·출력 보존·서비스 약한 참조를 확인한다. 정상 등록 검사는 테스트에서만 소켓을 소유하는 파생 세션을 사용한다. 다른 로컬 테스트 소스의 유무에 따라 전체 CTest 개수는 달라진다.
+
 ## 공통 로거
 
 `Core/Logger.h`의 전역 `GLogger`를 사용한다. `main()`에서 출력 대상과 최소 레벨을 설정하고, 이후에는 로그 매크로만 호출한다.
@@ -168,6 +185,10 @@ IOCP·세션 수명·종료 절차를 설계하고, 이후 프레이밍·메시�
 - [MSVC 소스 문자 집합과 BOM 감지](https://learn.microsoft.com/en-us/cpp/build/reference/source-charset-set-source-character-set)
 - [CMake VS 2026 생성기](https://cmake.org/cmake/help/latest/generator/Visual%20Studio%2018%202026.html)
 - [Git working-tree-encoding](https://git-scm.com/docs/gitattributes)
+
+로컬 `Tests/ServiceCapacityTests.cpp`가 있으면 `backend_service_capacity`를 조건부 등록한다. 정원 초과·중복 등록·삭제 후 재등록 및 동시 추가·삭제와 테스트 전용 파생 클래스에서 잠금으로 보호한 개수 조회를 확인한다. 기존 `backend_service`는 기본 Session의 소켓이 무효라는 이전 전제를 포함하므로 현재 검증 통과 대상으로 보고하지 않는다.
+
+작성 중인 `Listener`는 실패한 Accept 완료의 세션을 정리하고 정상 등록을 건너뛴다. 종료 중 도착한 완료도 정리하며, 종료 중이 아닌 비취소 실패는 기존 재요청 경로를 사용한다. `Close()`는 소켓 닫기 결과를 반환하고 소멸 경로는 실패 로그를 기록한다. 주소 출력 버퍼·즉시 실패 시 owner 해제·즉시 실패 재시도·종료 동기화 및 완료 회수·이벤트 메모리 정리는 아직 별도 수정이 필요하므로 실제 연결 수락·안전한 종료가 검증된 상태는 아니다.
 
 `WinsockRuntime` 생성자는 WSAStartup 성공 후 private SocketUtils::Init을 실행한다. 호출자는 GetSocketInitResult()로 전체 StatusCode를 한 번 확인하고 실패 시 GetWinsockError()로 원본 오류를 조회한다. WSA 시작 실패는 SC_NET_WINSOCK_STARTUP_FAILED, 확장 함수 조회 실패는 SC_NET_EXTENSION_FUNCTION_BIND_FAILED다. 확장 함수 초기화가 실패해도 WSA 시작이 성공했다면 소멸 시 WSACleanup을 호출한다. SocketUtils 생성은 금지하며 별도 자동 초기화 생성자는 제거했다. 서버·테스트 클라이언트 진입점도 통합 결과를 확인한다. 초기화는 소켓·워커 시작 전에 직렬로 수행한다. Listener의 즉시 실패 재귀 재시도는 보류 상태다.
 
