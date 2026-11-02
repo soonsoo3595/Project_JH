@@ -39,6 +39,12 @@ const char* GetStatusMessage(StatusCode code) noexcept
 	case StatusCode::SC_IOCP_CLOSE_FAILED: return "IOCP 핸들 해제 실패";
 	case StatusCode::SC_IOCP_INVALID_OBJECT: return "유효하지 않은 IOCP 객체";
 
+	// 서비스
+	case StatusCode::SC_SERVICE_INVALID_SESSION_FACTORY: return "세션 팩토리가 설정되지 않음";
+	case StatusCode::SC_SERVICE_SESSION_CREATE_FAILED: return "세션 팩토리가 세션을 생성하지 못함";
+	case StatusCode::SC_SERVICE_SESSION_LIMIT_REACHED: return "최대 세션 수에 도달함";
+	case StatusCode::SC_SERVICE_INVALID_SESSION: return "유효하지 않은 세션";
+
 	default: return "정의되지 않은 상태 코드";
 	}
 }

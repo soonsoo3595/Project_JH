@@ -21,8 +21,14 @@ add_library(jh_backend_core STATIC
     Core/IocpCore.h
     Core/IocpEvent.cpp
     Core/IocpEvent.h
+    Core/Listener.cpp
+    Core/Listener.h
     Core/NetAddress.cpp
     Core/NetAddress.h
+    Core/Service.cpp
+    Core/Service.h
+    Core/Session.cpp
+    Core/Session.h
     Core/SocketUtils.cpp
     Core/SocketUtils.h
     Core/StatusCode.cpp
@@ -50,6 +56,18 @@ endforeach()
 include(CTest)
 if(BUILD_TESTING)
     # 로컬 테스트 소스는 Git에 포함하지 않는다.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/ServiceCapacityTests.cpp")
+        add_executable(jh_backend_service_capacity_tests Tests/ServiceCapacityTests.cpp)
+        target_link_libraries(jh_backend_service_capacity_tests PRIVATE jh_backend_core)
+        add_test(NAME backend_service_capacity COMMAND jh_backend_service_capacity_tests)
+        set_tests_properties(backend_service_capacity PROPERTIES TIMEOUT 15)
+    endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/ServiceTests.cpp")
+        add_executable(jh_backend_service_tests Tests/ServiceTests.cpp)
+        target_link_libraries(jh_backend_service_tests PRIVATE jh_backend_core)
+        add_test(NAME backend_service COMMAND jh_backend_service_tests)
+        set_tests_properties(backend_service PROPERTIES TIMEOUT 15)
+    endif()
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/IocpCoreTests.cpp")
         add_executable(jh_backend_iocp_tests Tests/IocpCoreTests.cpp)
         target_link_libraries(jh_backend_iocp_tests PRIVATE jh_backend_core)

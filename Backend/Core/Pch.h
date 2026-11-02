@@ -13,4 +13,6 @@
 #include <winsock2.h>
 #include <shlobj.h>
 
+#include <cassert>
+
 using namespace std;

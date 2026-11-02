@@ -1,32 +1,46 @@
 ﻿#include "Core/IocpCore.h"
 
 #include "Core/IocpEvent.h"
+#include "Core/Logger.h"
 
 IocpCore::IocpCore()
 {
-	(void)Init();
+	const StatusCode result = Init();
+	if (result != StatusCode::SC_SUCCESS)
+	{
+		const DWORD nativeError = ::GetLastError();
+		LOG_ERROR("IOCP 초기화 실패: %s (Windows 오류: %lu)", GetStatusMessage(result), nativeError);
+	}
 }
 
 IocpCore::~IocpCore()
 {
-	(void)Close();
+	const StatusCode result = Close();
+	if (result != StatusCode::SC_SUCCESS)
+	{
+		const DWORD nativeError = ::GetLastError();
+		LOG_ERROR("IOCP 해제 실패: %s (Windows 오류: %lu)", GetStatusMessage(result), nativeError);
+	}
 }
 
 StatusCode IocpCore::Register(IocpObjectRef iocpObject) const
 {
-	if (_handle == nullptr)
+	if (_handle == INVALID_HANDLE_VALUE)
 	{
 		return StatusCode::SC_IOCP_NOT_INITIALIZED;
 	}
+
 	if (iocpObject == nullptr)
 	{
 		return StatusCode::SC_IOCP_INVALID_OBJECT;
 	}
+
 	const HANDLE handle = iocpObject->GetHandle();
-	if (handle == nullptr || handle == INVALID_HANDLE_VALUE)
+	if (handle == INVALID_HANDLE_VALUE)
 	{
 		return StatusCode::SC_NET_INVALID_SOCKET;
 	}
+
 	if (::CreateIoCompletionPort(handle, _handle, 0, 0) == nullptr)
 	{
 		return StatusCode::SC_IOCP_REGISTER_FAILED;
@@ -37,7 +51,7 @@ StatusCode IocpCore::Register(IocpObjectRef iocpObject) const
 
 StatusCode IocpCore::Dispatch(uint32 timeoutMs) const
 {
-	if (_handle == nullptr)
+	if (_handle == INVALID_HANDLE_VALUE)
 	{
 		return StatusCode::SC_IOCP_NOT_INITIALIZED;
 	}
@@ -45,13 +59,15 @@ StatusCode IocpCore::Dispatch(uint32 timeoutMs) const
 	DWORD numOfBytes = 0;
 	ULONG_PTR key = 0;
 	OVERLAPPED* overlapped = nullptr;
+
+	// GetQueuedCompletionStatus가 FALSE를 반환한다고 아무런 이벤트가 없다는 의미는 아니다. 실패한 I/O의 완료일 수 있다.
 	const BOOL succeeded = ::GetQueuedCompletionStatus(_handle, OUT &numOfBytes, OUT &key,
 		OUT &overlapped, timeoutMs);
 	const DWORD error = succeeded != FALSE ? ERROR_SUCCESS : ::GetLastError();
 
 	if (overlapped == nullptr)
 	{
-		// 수동 알림은 이벤트가 없을 수 있다. 패킷 없는 실패와 구분한다.
+		// 수동 알림은 이벤트가 없을 수 있다.
 		if (succeeded != FALSE)
 		{
 			return StatusCode::SC_SUCCESS;
@@ -75,29 +91,33 @@ StatusCode IocpCore::Dispatch(uint32 timeoutMs) const
 
 StatusCode IocpCore::Init(uint32 concurrentThreadCount)
 {
-	if (_handle != nullptr)
+	if (_handle != INVALID_HANDLE_VALUE)
 	{
 		return StatusCode::SC_IOCP_ALREADY_INITIALIZED;
 	}
+
 	const HANDLE handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, concurrentThreadCount);
 	if (handle == nullptr)
 	{
 		return StatusCode::SC_IOCP_CREATE_FAILED;
 	}
+
 	_handle = handle;
 	return StatusCode::SC_SUCCESS;
 }
 
 StatusCode IocpCore::Close()
 {
-	if (_handle == nullptr)
+	if (_handle == INVALID_HANDLE_VALUE)
 	{
 		return StatusCode::SC_SUCCESS;
 	}
+
 	if (CloseHandle(_handle) == FALSE)
 	{
 		return StatusCode::SC_IOCP_CLOSE_FAILED;
 	}
-	_handle = nullptr;
+
+	_handle = INVALID_HANDLE_VALUE;
 	return StatusCode::SC_SUCCESS;
 }

@@ -7,7 +7,7 @@
 #include <memory>
 #include <mutex>
 
-// 출력·갱신 매개변수 표시용이다. Windows SDK에 정의되어 있으면 그대로 사용한다.
+// 출력·갱신 매개변수 표시용
 #ifndef OUT
 #define OUT
 #endif
@@ -31,14 +31,16 @@ static_assert(sizeof(float32) * CHAR_BIT == 32, "float32는 32비트여야 합�
 static_assert(sizeof(float64) * CHAR_BIT == 64, "float64는 64비트여야 합니다.");
 
 template<typename T>
-using Atomic		= std::atomic<T>;
+using Atomic			= std::atomic<T>;
 
-using Mutex			= std::mutex;
-using CondVar		= std::condition_variable;
-using UniqueLock	= std::unique_lock<Mutex>;
-using LockGuard		= std::lock_guard<Mutex>;
+using Mutex				= std::mutex;
+using CondVar			= std::condition_variable;
+using UniqueLock		= std::unique_lock<Mutex>;
+using LockGuard			= std::lock_guard<Mutex>;
 
-// bool·char·std::size_t와 문자열·포인터는 원래 타입을 사용한다.
-// 별칭은 새 타입이 아니며 네트워크 전송 시 바이트 순서·직렬화는 별도로 처리한다.
-
-using IocpObjectRef = std::shared_ptr<class IocpObject>;
+// Ref
+using IocpObjectRef		= std::shared_ptr<class IocpObject>;
+using IocpCoreRef		= std::shared_ptr<class IocpCore>;
+using SessionRef		= std::shared_ptr<class Session>;
+using ListenerRef		= std::shared_ptr<class Listener>;
+using ServiceRef		= std::shared_ptr<class Service>;

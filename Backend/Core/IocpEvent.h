@@ -38,3 +38,35 @@ private:
 	IocpEventType	_type;
 	IocpObjectRef	_owner;
 };
+
+class ConnectEvent : public IocpEvent
+{
+public:
+	ConnectEvent() : IocpEvent(IocpEventType::Connect) {}
+};
+
+class DisconnectEvent : public IocpEvent
+{
+public:
+	DisconnectEvent() : IocpEvent(IocpEventType::Disconnect) {}
+};
+
+class AcceptEvent : public IocpEvent
+{
+public:
+	AcceptEvent() : IocpEvent(IocpEventType::Accept) {}
+
+	SessionRef session;
+};
+
+class RecvEvent : public IocpEvent
+{
+public:
+	RecvEvent() : IocpEvent(IocpEventType::Recv) {}
+};
+
+class SendEvent : public IocpEvent
+{
+public:
+	SendEvent() : IocpEvent(IocpEventType::Send) {}
+};
