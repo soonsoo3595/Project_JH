@@ -1,9 +1,11 @@
 # Project JH 현재 상태
 
-최종 갱신: 2026-11-02 (Asia/Seoul)
+최종 갱신: 2026-11-04 (Asia/Seoul)
 상태 관리: 현재 PM 채팅
 
 ## 현재 단계
+
+2026-11-04 사용자 지정으로 세션 생성 시 ID 발급과 ID 기반 등록·삭제를 추가했다. 사용자 HashMap<uint64, SessionRef>·reserve 변경을 유지하고 생성/IOCP 등록과 연결 성공 후 집합 추가는 분리했다. 백엔드 보고 기준 지정 대상 Debug·Release 빌드·선택 CTest 각 3/3 통과이며 제품 Listener 전체·전체 CTest 검증은 아니다.
 
 2026-11-01 사용자 승인 후 TestClient의 LOG_ERROR 오타·SocketUtils 주석·README getter 설명을 수정해 이전 컴파일 실패·커밋 보류를 해소했다. 백엔드 보고 기준 Debug·Release Core·서버·클라이언트·로컬 검사 대상 빌드 및 선택 CTest 각 3/3 통과. 승인된 Winsock/SocketUtils 변경은 9f6222f, README 두 단락은 278d3da로 선택 커밋했다. Service/Listener/Session과 관련 공통 문서 등은 미커밋으로 유지한다. 스테이징은 비어 있고 push·PR·병합은 없으며 전체 CTest·제품 Listener 전체 검증을 의미하지 않는다. PM은 커밋 이력·잔여 상태·현재 호출부를 대조했고 빌드·실행은 재수행하지 않았다. 아래 오타 실패·보류 기록은 수정 전 이력이다.
 
@@ -42,6 +44,8 @@
 2026-10-24에 사용자가 콘솔 한글 깨짐을 다시 보고했다. 백엔드 세션은 당시 두 진입점에 콘솔 초기화가 모두 없는 것을 확인하고, 콘솔이 연결된 경우 `SetConsoleOutputCP(CP_UTF8)`를 호출하도록 추가했다. 설정 실패 시 오류 코드 출력 후 종료하고 콘솔이 없으면 건너뛴다. UTF-8 BOM·CRLF·MSVC `/utf-8`은 유지하며 시스템 전체 설정과 공통 로거 설계는 변경하지 않았다. PM은 공유 소스와 README의 반영 상태를 확인했으며 빌드·실행은 다시 수행하지 않았다.
 
 ## 확정한 사항
+
+- Session 생성자는 static Atomic<uint64>로 ID를 한 번 발급하고 private _sessionId·GetSessionId만 제공한다. setter는 없다. Service의 세션 저장소는 HashMap<uint64, SessionRef>이며 AddSession은 같은 잠금 안에서 ID find→정원 검사→emplace를 수행한다. operator[]로 빈 항목을 만들지 않고 중복 등록은 개수를 늘리지 않는다. 최신 요청으로 RemoveSession은 StatusCode를 반환한다. nullptr는 SC_SERVICE_INVALID_SESSION, 미등록 ID는 새 SC_SERVICE_SESSION_NOT_FOUND, 실제 ID erase 성공은 SC_SUCCESS와 기존 Info 로그로 구분한다. 제품 호출부는 아직 없다. CreateSession의 생성·IOCP 등록과 연결 성공 후 AddSession은 분리하며 정원을 예약하지 않는다.
 
 - 2026-11-02 사용자 지정으로 Listener::ProcessAccept에서 AddSession 반환값을 확인한다. 실패하면 상태 설명·코드를 Warning 로그로 남기고 지역 세션 참조를 해제한 뒤 기존 RegisterAccept를 호출하고 반환한다. 백엔드 보고 기준 Debug Core 빌드·공백 검사 통과. 새 테스트·실제 Accept 실패 주입·Release·커밋은 미수행이다. 기존 주소 버퍼·재귀 재시도·종료 동기화·이벤트 해제 보류 사항은 이번에 변경하지 않았다. PM은 실패 분기만 대조했고 코드 수정·빌드·실행·QA는 하지 않았다.
 
@@ -141,6 +145,10 @@
 - PCH 추가 후 정상 CMake 구성은 vcpkg 7zip v26.02 다운로드의 DNS 오류로 실패했다. 백엔드 세션은 외부 의존성이 비어 있는 상태에서 검증 중에만 `VCPKG_MANIFEST_INSTALL=OFF`로 빌드하고 이후 캐시를 ON으로 복원했다고 보고했다. 2026-10-23 PM이 샌드박스 밖 도구 캐시 접근으로 manifest 설치 ON 상태의 정상 구성을 완료했다. 제한된 실행 환경에서는 같은 다운로드 DNS 오류가 발생할 수 있다. 프리셋과 manifest 설치 설정은 유지했다.
 
 ## 검증 상태
+
+- 백엔드 세션의 2026-11-04 RemoveSession 상태 반환 후속 보고: Debug·Release 관련 4대상 빌드·선택 CTest 각 3/3 통과, 로컬 검사에서 반환값을 확인했다. 기존 Listener/Session 경고는 유지한다. 전체 CTest·제품 Listener 전체 흐름·커밋은 미수행이다. PM은 반환 분기·상태 항목·선언을 대조했고 코드 수정·빌드·실행·QA는 하지 않았다. 이전 nullptr·미등록 무시 계약은 이 변경으로 대체한다.
+
+- 백엔드 세션의 2026-11-04 세션 ID·등록 변경 보고: Debug·Release Core·서버·클라이언트·로컬 검사 대상 빌드와 선택 CTest 각 3/3 통과. 로컬에서 8스레드×64개 생성 ID 중복 없음, ID 조회·정원·중복·삭제 후 재등록·동시 등록/삭제를 확인했다. 테스트는 Git 제외이며 제품 Listener 전체·전체 CTest·F5·커밋은 미수행이다. 기존 Listener 주소 버퍼·재귀 재시도·종료 보류 사항은 미수정이다. PM은 ID 발급·공개 조회·잠금 내부 map 처리와 README를 대조했고 코드 수정·빌드·실행·QA는 하지 않았다.
 
 - 백엔드 세션의 2026-11-01 최신 검토 보고: Core·서버·로컬 검사 Debug·Release 빌드 및 선택 CTest 각 2/2(초기화/정리·별도 루프백 Accept 컨텍스트 검사와 서버 시작) 통과. TestClient/Main.cpp:18은 GetWinSockErrorLOG_ERROR 미정의로 Debug C3861 실패했다. SocketUtils의 AcceptEx 컨텍스트 상속·독점 옵션 기본값 주석 및 README 과거 API 명칭 수정도 승인 안내 대상으로 남겼다. 커밋은 보류이며 기존 전체 변경·보류 중인 Listener 문제가 검토를 통과한 것으로 해석하지 않는다. PM은 해당 호출부만 대조했고 코드 수정·빌드·실행·추가 리뷰·QA·커밋은 하지 않았다.
 

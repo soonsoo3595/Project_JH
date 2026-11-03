@@ -37,7 +37,7 @@ public:
 
 	StatusCode			CreateSession(OUT SessionRef& session);
 	StatusCode			AddSession(SessionRef session);
-	void				RemoveSession(SessionRef session);
+	StatusCode				RemoveSession(SessionRef session);
 
 public:
 	ServiceType			GetType() const noexcept			{ return _type; }
@@ -51,9 +51,9 @@ protected:
 	Mutex				_mutex;
 
 protected:
-	SessionFactory		_sessionFactory;
-	Set<SessionRef>		_sessions;
-	int32				_maxSessionCount = 0;
+	SessionFactory					_sessionFactory;
+	HashMap<uint64, SessionRef>		_sessions;
+	int32							_maxSessionCount = 0;
 };
 
 class ServerService : public Service

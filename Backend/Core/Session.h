@@ -17,11 +17,14 @@ public:
 
 	SOCKET						GetSocket() const noexcept { return _socket; }
 
+	uint64 GetSessionId() const noexcept { return _sessionId; }
+
 public:
 	virtual HANDLE	GetHandle() override { return reinterpret_cast<HANDLE>(_socket); }
 	virtual void	Dispatch(IocpEvent* iocpEvent, DWORD numOfBytes = 0, DWORD error = ERROR_SUCCESS) override;
 
 private:
+	uint64					_sessionId = 0;
 	std::weak_ptr<Service>	_service;
 	SOCKET					_socket = INVALID_SOCKET;
 	Atomic<bool> 			_isConnected = false;

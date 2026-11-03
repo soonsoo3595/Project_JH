@@ -11,6 +11,7 @@ Service::Service(ServiceType type, NetAddress address, int32 maxSessionCount)
 	: _type(type), _address(address), _maxSessionCount(maxSessionCount)
 {
 	assert(_maxSessionCount > 0);
+	_sessions.reserve(static_cast<std::size_t>(_maxSessionCount));
 
 	_iocpCore = std::make_shared<IocpCore>();
 	_sessionFactory = []() -> SessionRef
@@ -88,10 +89,12 @@ StatusCode Service::AddSession(SessionRef session)
 		return StatusCode::SC_SERVICE_INVALID_SESSION;
 	}
 
+	const uint64 sessionId = session->GetSessionId();
+
 	int32 currentSessionCount = 0;
 	{
 		LockGuard lock(_mutex);
-		if (_sessions.find(session) != _sessions.end())
+		if (_sessions.find(sessionId) != _sessions.end())
 		{
 			return StatusCode::SC_SUCCESS;
 		}
@@ -101,7 +104,7 @@ StatusCode Service::AddSession(SessionRef session)
 			return StatusCode::SC_SERVICE_SESSION_LIMIT_REACHED;
 		}
 
-		_sessions.insert(session);
+		_sessions.emplace(sessionId, session);
 		currentSessionCount = static_cast<int32>(_sessions.size());
 	}
 
@@ -109,19 +112,25 @@ StatusCode Service::AddSession(SessionRef session)
 	return StatusCode::SC_SUCCESS;
 }
 
-void Service::RemoveSession(SessionRef session)
+StatusCode Service::RemoveSession(SessionRef session)
 {
+	if (session == nullptr)
+	{
+		return StatusCode::SC_SERVICE_INVALID_SESSION;
+	}
+
 	int32 currentSessionCount = 0;
 	{
 		LockGuard lock(_mutex);
-		if (_sessions.erase(session) == 0)
+		if (_sessions.erase(session->GetSessionId()) == 0)
 		{
-			return;
+			return StatusCode::SC_SERVICE_SESSION_NOT_FOUND;
 		}
 		currentSessionCount = static_cast<int32>(_sessions.size());
 	}
 
 	LOG_INFO("세션 삭제: %d / %d", currentSessionCount, _maxSessionCount);
+	return StatusCode::SC_SUCCESS;
 }
 
 ServerService::ServerService(NetAddress targetAddress, int32 maxSessionCount)

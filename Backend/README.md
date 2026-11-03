@@ -103,9 +103,9 @@ I/O 요청 전 `IocpEvent::SetOwner()`로 소유 객체를 설정하고 완료 �
 
 ## 작성 중인 서비스·세션
 
-`Service`는 IOCP 코어와 세션 팩토리·세션 집합을 보관한다. `ServerService`와 `ClientService`의 `Start()`는 부모의 IOCP 초기화·팩토리 설정 검사를 먼저 호출한다. 서비스는 `shared_ptr`로 소유하고 `Session`의 서비스 참조는 `weak_ptr`로 유지한다.
+`Service`는 IOCP 코어와 세션 팩토리·`HashMap<uint64, SessionRef>`를 보관한다. `ServerService`와 `ClientService`의 `Start()`는 부모의 IOCP 초기화·팩토리 설정 검사를 먼저 호출한다. 서비스는 `shared_ptr`로 소유하고 `Session`의 서비스 참조는 `weak_ptr`로 유지한다.
 
-`CreateSession(OUT SessionRef& session)`은 `StatusCode`를 반환한다. 성공했을 때만 출력 인자를 교체하며 실패하면 기존 출력 값을 유지한다. 성공한 세션은 IOCP에 등록되고 서비스의 약한 참조를 보관한다. 세션 집합에 추가하는 작업은 별도다.
+`CreateSession(OUT SessionRef& session)`은 `StatusCode`를 반환한다. 성공했을 때만 출력 인자를 교체하며 실패하면 기존 출력 값을 유지한다. 성공한 세션은 IOCP에 등록되고 서비스의 약한 참조를 보관한다. 해시맵에 추가하는 작업은 별도다. Session 생성자는 프로세스 공통 atomic 카운터로 1부터 ID를 한 번 발급하며 GetSessionId()로 조회한다. 삭제된 ID는 재사용하지 않고 생성·등록 실패에 따른 번호 공백은 허용한다. AddSession은 ID를 발급하지 않고 find로 중복을 검사한 뒤 정원 검사와 emplace를 같은 잠금 안에서 처리한다. RemoveSession은 StatusCode를 반환하며 nullptr는 SC_SERVICE_INVALID_SESSION, 미등록 세션은 SC_SERVICE_SESSION_NOT_FOUND, ID 기반 삭제 성공은 SC_SUCCESS다. 실제 삭제 시에만 Info 로그를 기록한다.
 
 - `SC_SERVICE_INVALID_SESSION_FACTORY`: 세션 팩토리가 비어 있다.
 - `SC_SERVICE_SESSION_CREATE_FAILED`: 팩토리가 널 세션을 반환했다.

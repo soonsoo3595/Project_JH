@@ -5,6 +5,10 @@
 
 Session::Session()
 {
+	// 프로세스 안에서 생성마다 한 번 발급하며 삭제된 ID는 재사용하지 않는다.
+	static Atomic<uint64> nextSessionId{1};
+	_sessionId = nextSessionId.fetch_add(1);
+
 	const StatusCode result = SocketUtils::CreateTcpSocket(_socket);
 	if (result != StatusCode::SC_SUCCESS)
 	{
